@@ -13,32 +13,12 @@ function isFestivalPage(): boolean {
   return /https?:\/\/(?:www\.)?bilibili\.com\/festival\/.*/.test(document.URL)
 }
 
-// Safari 检测函数
 function isSafariRuntime(): boolean {
   const ua = navigator.userAgent
-  const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)
-  const isWebKit = CSS.supports?.('-webkit-backdrop-filter', 'blur(1px)') ?? false
-  return isSafari && isWebKit
-}
-
-const SAFARI_BRIDGE_VARS = ['--bg1', '--bg2', '--text1', '--text3', '--line1'] as const
-const SAFARI_BRIDGE_HOSTS = 'bili-comments'
-
-function safariBridgeToCommentsHost() {
-  const rootStyle = getComputedStyle(document.documentElement)
-  document.querySelectorAll<HTMLElement>(SAFARI_BRIDGE_HOSTS).forEach((host) => {
-    SAFARI_BRIDGE_VARS.forEach((k) => {
-      const v = rootStyle.getPropertyValue(k).trim()
-      if (v)
-        host.style.setProperty(k, v)
-    })
-  })
-}
-
-function safariUnbridgeFromCommentsHost() {
-  document.querySelectorAll<HTMLElement>(SAFARI_BRIDGE_HOSTS).forEach((host) => {
-    SAFARI_BRIDGE_VARS.forEach(k => host.style.removeProperty(k))
-  })
+  const vendor = navigator.vendor
+  const isSafari = /Safari/i.test(ua)
+  const isChromeLike = /Chrome|Chromium|Edg/i.test(ua)
+  return isSafari && !isChromeLike && /Apple/i.test(vendor)
 }
 
 /**
@@ -56,45 +36,54 @@ function setDarkModeBaseColor(color: string) {
   }
 }
 
-export function useDark() {
-  let safariRuntimeLogged = false
-  let safariProbeLogged = false
+function collectCssVariablesByPrefixes(
+  style: CSSStyleDeclaration,
+  prefixes: string[],
+): Record<string, string> {
+  const variables: Record<string, string> = {}
+  for (let i = 0; i < style.length; i += 1) {
+    const name = style[i]
+    if (!prefixes.some(prefix => name.startsWith(prefix)))
+      continue
+    const value = style.getPropertyValue(name).trim()
+    if (value)
+      variables[name] = value
+  }
+  return variables
+}
 
-  if (import.meta.env.DEV && isSafariRuntime() && !safariRuntimeLogged) {
-    safariRuntimeLogged = true
-    console.debug('[bewly:safari] runtime detected', {
-      ua: navigator.userAgent,
-      prefersDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
-      hasBiliComments: !!document.querySelector('bili-comments'),
+function syncCommentsThemeVariables(targets?: Element[]) {
+  const hosts = targets ?? Array.from(document.querySelectorAll('bili-comments, bili-user-profile'))
+  if (!hosts.length)
+    return
+  const rootStyle = getComputedStyle(document.documentElement)
+  const variables = collectCssVariablesByPrefixes(rootStyle, ['--bg', '--text', '--graph', '--line'])
+  if (!Object.keys(variables).length)
+    return
+  hosts.forEach((host) => {
+    Object.entries(variables).forEach(([name, value]) => {
+      host.style.setProperty(name, value)
     })
-  }
+  })
+}
 
-  if (import.meta.env.DEV && isSafariRuntime() && !safariProbeLogged) {
-    const probe = () => {
-      safariProbeLogged = true
-      const rootStyle = getComputedStyle(document.documentElement)
-      const host = document.querySelector('bili-comments') as HTMLElement | null
-      if (!host)
-        return false
+function clearCommentsThemeVariables() {
+  const hosts = Array.from(document.querySelectorAll('bili-comments, bili-user-profile'))
+  if (!hosts.length)
+    return
+  const rootStyle = getComputedStyle(document.documentElement)
+  const variables = collectCssVariablesByPrefixes(rootStyle, ['--bg', '--text', '--graph', '--line'])
+  const variableNames = Object.keys(variables)
+  if (!variableNames.length)
+    return
+  hosts.forEach((host) => {
+    variableNames.forEach((name) => {
+      host.style.removeProperty(name)
+    })
+  })
+}
 
-      console.debug('[bewly:safari] theme vars probe', {
-        root_bg1: rootStyle.getPropertyValue('--bg1').trim(),
-        root_text1: rootStyle.getPropertyValue('--text1').trim(),
-        host_bg1: getComputedStyle(host).getPropertyValue('--bg1').trim(),
-        host_text1: getComputedStyle(host).getPropertyValue('--text1').trim(),
-      })
-      return true
-    }
-
-    // Try for up to ~3s (30 * 100ms)
-    let tries = 0
-    const timer = window.setInterval(() => {
-      tries += 1
-      if (probe() || tries >= 30)
-        window.clearInterval(timer)
-    }, 100)
-  }
-
+export function useDark() {
   const isPreferredDark = usePreferredDark()
   const currentSystemColorScheme = computed(() => isPreferredDark.value ? 'dark' : 'light')
   const currentAppColorScheme = computed((): 'dark' | 'light' => {
@@ -105,19 +94,9 @@ export function useDark() {
   })
   const isDark = computed(() => currentAppColorScheme.value === 'dark')
   let themeChangeTimer: NodeJS.Timeout | null = null
-
-  let safariBridgeObserver: MutationObserver | null = null
-  let safariBridgeScheduled = false
-
-  function scheduleSafariBridge() {
-    if (safariBridgeScheduled)
-      return
-    safariBridgeScheduled = true
-    requestAnimationFrame(() => {
-      safariBridgeScheduled = false
-      safariBridgeToCommentsHost()
-    })
-  }
+  let wasDark = false
+  let commentThemeObserver: MutationObserver | null = null
+  const shouldSyncBiliCommentsTheme = isSafariRuntime()
 
   // Watch for changes in the 'settings.value.theme' variable and add the 'dark' class to the 'mainApp' element
   // to prevent some Unocss dark-specific styles from failing to take effect
@@ -140,7 +119,7 @@ export function useDark() {
     { immediate: true },
   )
 
-  // use watchEffect instead of onMounted because onMounted is only available in setup function
+  // use watchEffect instead of onMounted because onMounted is only aviailable in setup function
   watchEffect(() => {
     // Because some shadow dom may not be loaded when the page has already loaded, we need to wait until the page is idle
     runWhenIdle(() => {
@@ -186,19 +165,8 @@ export function useDark() {
       // 确保深色模式基准颜色被正确应用
       setDarkModeBaseColor(settings.value.darkModeBaseColor)
 
-      if (isSafariRuntime()) {
-        safariBridgeToCommentsHost()
-        scheduleSafariBridge()
-
-        if (!safariBridgeObserver) {
-          safariBridgeObserver = new MutationObserver(() => {
-            if (!isDark.value)
-              return
-            scheduleSafariBridge()
-          })
-          safariBridgeObserver.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
-        }
-      }
+      if (shouldSyncBiliCommentsTheme)
+        syncCommentsThemeVariables()
 
       setCookie('theme_style', 'dark', 365 * 10)
       window.dispatchEvent(new CustomEvent('global.themeChange', { detail: 'dark' }))
@@ -213,11 +181,8 @@ export function useDark() {
         document.documentElement.classList.remove('bili_dark')
       }
 
-      if (isSafariRuntime()) {
-        safariUnbridgeFromCommentsHost()
-        safariBridgeObserver?.disconnect()
-        safariBridgeObserver = null
-      }
+      if (shouldSyncBiliCommentsTheme)
+        clearCommentsThemeVariables()
 
       setCookie('theme_style', 'light', 365 * 10)
       window.dispatchEvent(new CustomEvent('global.themeChange', { detail: 'light' }))
@@ -227,8 +192,7 @@ export function useDark() {
     // It seems like Bilibili already supports dark mode when the `bili_dark` class is added to the `html` element
     // but it's not yet fully refined.
     if (currentAppColorScheme.value === 'dark') {
-      // Safari: keep `bili_dark` to stabilize Bilibili Web Components theme behavior in WebKit.
-      if (!isSafariRuntime() && document.documentElement.classList.contains('bili_dark')) {
+      if (document.documentElement.classList.contains('bili_dark')) {
         document.documentElement.classList.remove('bili_dark')
       }
     }
@@ -237,6 +201,37 @@ export function useDark() {
     //     document.documentElement.classList.add('bili_dark')
     //   }
     // }
+
+    if (isDark.value && !wasDark && shouldSyncBiliCommentsTheme) {
+      if (!commentThemeObserver) {
+        commentThemeObserver = new MutationObserver((mutations) => {
+          if (!isDark.value)
+            return
+          const hosts: Element[] = []
+          mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+              if (!(node instanceof Element))
+                return
+              if (node.matches('bili-comments, bili-user-profile'))
+                hosts.push(node)
+              node.querySelectorAll?.('bili-comments, bili-user-profile').forEach((el) => {
+                hosts.push(el)
+              })
+            })
+          })
+          if (hosts.length)
+            syncCommentsThemeVariables(hosts)
+        })
+        commentThemeObserver.observe(document.documentElement, { childList: true, subtree: true })
+      }
+    }
+
+    if (!isDark.value && commentThemeObserver && shouldSyncBiliCommentsTheme) {
+      commentThemeObserver.disconnect()
+      commentThemeObserver = null
+    }
+
+    wasDark = isDark.value
   }
 
   function toggleDark(e: MouseEvent) {
@@ -248,7 +243,7 @@ export function useDark() {
     }
 
     const isAppearanceTransition = typeof document !== 'undefined'
-      // @ts-expect-error: Transition API
+    // @ts-expect-error: Transition API
       && document.startViewTransition
       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (!isAppearanceTransition) {
