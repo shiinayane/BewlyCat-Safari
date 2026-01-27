@@ -21,6 +21,26 @@ function isSafariRuntime(): boolean {
   return isSafari && isWebKit
 }
 
+const SAFARI_BRIDGE_VARS = ['--bg1', '--bg2', '--text1', '--text3', '--line1'] as const
+const SAFARI_BRIDGE_HOSTS = 'bili-comments'
+
+function safariBridgeToCommentsHost() {
+  const rootStyle = getComputedStyle(document.documentElement)
+  document.querySelectorAll<HTMLElement>(SAFARI_BRIDGE_HOSTS).forEach((host) => {
+    SAFARI_BRIDGE_VARS.forEach((k) => {
+      const v = rootStyle.getPropertyValue(k).trim()
+      if (v)
+        host.style.setProperty(k, v)
+    })
+  })
+}
+
+function safariUnbridgeFromCommentsHost() {
+  document.querySelectorAll<HTMLElement>(SAFARI_BRIDGE_HOSTS).forEach((host) => {
+    SAFARI_BRIDGE_VARS.forEach(k => host.style.removeProperty(k))
+  })
+}
+
 /**
  * 设置深色模式基准颜色
  */
@@ -37,6 +57,44 @@ function setDarkModeBaseColor(color: string) {
 }
 
 export function useDark() {
+  let safariRuntimeLogged = false
+  let safariProbeLogged = false
+
+  if (import.meta.env.DEV && isSafariRuntime() && !safariRuntimeLogged) {
+    safariRuntimeLogged = true
+    console.debug('[bewly:safari] runtime detected', {
+      ua: navigator.userAgent,
+      prefersDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
+      hasBiliComments: !!document.querySelector('bili-comments'),
+    })
+  }
+
+  if (import.meta.env.DEV && isSafariRuntime() && !safariProbeLogged) {
+    const probe = () => {
+      safariProbeLogged = true
+      const rootStyle = getComputedStyle(document.documentElement)
+      const host = document.querySelector('bili-comments') as HTMLElement | null
+      if (!host)
+        return false
+
+      console.debug('[bewly:safari] theme vars probe', {
+        root_bg1: rootStyle.getPropertyValue('--bg1').trim(),
+        root_text1: rootStyle.getPropertyValue('--text1').trim(),
+        host_bg1: getComputedStyle(host).getPropertyValue('--bg1').trim(),
+        host_text1: getComputedStyle(host).getPropertyValue('--text1').trim(),
+      })
+      return true
+    }
+
+    // Try for up to ~3s (30 * 100ms)
+    let tries = 0
+    const timer = window.setInterval(() => {
+      tries += 1
+      if (probe() || tries >= 30)
+        window.clearInterval(timer)
+    }, 100)
+  }
+
   const isPreferredDark = usePreferredDark()
   const currentSystemColorScheme = computed(() => isPreferredDark.value ? 'dark' : 'light')
   const currentAppColorScheme = computed((): 'dark' | 'light' => {
@@ -47,6 +105,19 @@ export function useDark() {
   })
   const isDark = computed(() => currentAppColorScheme.value === 'dark')
   let themeChangeTimer: NodeJS.Timeout | null = null
+
+  let safariBridgeObserver: MutationObserver | null = null
+  let safariBridgeScheduled = false
+
+  function scheduleSafariBridge() {
+    if (safariBridgeScheduled)
+      return
+    safariBridgeScheduled = true
+    requestAnimationFrame(() => {
+      safariBridgeScheduled = false
+      safariBridgeToCommentsHost()
+    })
+  }
 
   // Watch for changes in the 'settings.value.theme' variable and add the 'dark' class to the 'mainApp' element
   // to prevent some Unocss dark-specific styles from failing to take effect
@@ -115,6 +186,20 @@ export function useDark() {
       // 确保深色模式基准颜色被正确应用
       setDarkModeBaseColor(settings.value.darkModeBaseColor)
 
+      if (isSafariRuntime()) {
+        safariBridgeToCommentsHost()
+        scheduleSafariBridge()
+
+        if (!safariBridgeObserver) {
+          safariBridgeObserver = new MutationObserver(() => {
+            if (!isDark.value)
+              return
+            scheduleSafariBridge()
+          })
+          safariBridgeObserver.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
+        }
+      }
+
       setCookie('theme_style', 'dark', 365 * 10)
       window.dispatchEvent(new CustomEvent('global.themeChange', { detail: 'dark' }))
     }
@@ -126,6 +211,12 @@ export function useDark() {
         document.documentElement.classList.remove('dark')
         document.body?.classList.remove('dark')
         document.documentElement.classList.remove('bili_dark')
+      }
+
+      if (isSafariRuntime()) {
+        safariUnbridgeFromCommentsHost()
+        safariBridgeObserver?.disconnect()
+        safariBridgeObserver = null
       }
 
       setCookie('theme_style', 'light', 365 * 10)
