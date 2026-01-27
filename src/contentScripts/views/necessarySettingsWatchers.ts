@@ -52,14 +52,20 @@ export function setupNecessarySettingsWatchers() {
     async () => {
       // if there is first-time load extension, set the default language by browser display language
       if (!settings.value.language) {
-        if (browser.i18n.getUILanguage() === 'zh-CN') {
+        const uiLang = browser.i18n.getUILanguage()
+        // Safari may return 'zh-Hans' or 'zh-Hant' instead of 'zh-CN' or 'zh-TW'
+        const isSimplifiedChinese = uiLang === 'zh-CN' || uiLang === 'zh-Hans' || uiLang.startsWith('zh-Hans')
+        const isTraditionalChinese = uiLang === 'zh-TW' || uiLang === 'zh-HK'
+          || uiLang === 'zh-Hant' || uiLang.startsWith('zh-Hant')
+
+        if (isSimplifiedChinese) {
           settings.value.language = LanguageType.Mandarin_CN
         }
-        else if (browser.i18n.getUILanguage() === 'zh-TW') {
-          // Since getUILanguage() cannot get the zh-HK language code
+        else if (isTraditionalChinese) {
+          // Since getUILanguage() cannot get the zh-HK language code reliably
           // use getAcceptLanguages() to get the language code
           const languages: string[] = await browser.i18n.getAcceptLanguages()
-          if (languages.includes('zh-HK')) {
+          if (languages.includes('zh-HK') || languages.some(l => l.startsWith('zh-Hant-HK'))) {
             settings.value.language = LanguageType.Cantonese
           }
           else {
