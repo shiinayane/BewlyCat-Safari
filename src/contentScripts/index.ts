@@ -18,7 +18,7 @@ import { compareVersions, injectCSS, isHomePage, isInIframe, isNotificationPage,
 import { applyAutoPlayByVideoType, applyDefaultDanmakuState, defaultMode, handleVideoPageNavigation, isCollectionVideo, isVideoPage, startAutoExitFullscreenMonitoring, startAutoPlayUserChangeMonitoring, webFullscreen, widescreen } from '~/utils/player'
 import { initRandomPlay, resetRandomPlayInitialization } from '~/utils/randomPlay'
 import { setupShortcutHandlers } from '~/utils/shortcuts'
-import { SVG_ICONS } from '~/utils/svgIcons'
+import { getSvgIcons } from '~/utils/svgIcons'
 import { openLinkInBackground } from '~/utils/tabs'
 
 import { version } from '../../package.json'
@@ -550,7 +550,7 @@ function injectApp() {
 
   // inject svg icons
   const svgDiv = document.createElement('div')
-  svgDiv.innerHTML = SVG_ICONS
+  svgDiv.innerHTML = getSvgIcons()
   shadowDOM.appendChild(svgDiv)
 
   document.body.appendChild(container)
