@@ -23,3 +23,19 @@ node_modules
 extension-safari-macos/
 # src/old-extension/
 .playwright-mcp/
+
+# --- Safari Web Extension Converter / Xcode ---
+*Converted*/
+**/*Converted*/
+DerivedData/
+_safari_build/
+*.xcworkspace/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
