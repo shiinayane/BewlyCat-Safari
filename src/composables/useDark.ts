@@ -200,13 +200,14 @@ export function useDark() {
     // It seems like Bilibili already supports dark mode when the `bili_dark` class is added to the `html` element
     // but it's not yet fully refined.
     if (currentAppColorScheme.value === 'dark') {
-      // debug
-      debugTheme('before removing bili_dark (legacy)')
-      if (document.documentElement.classList.contains('bili_dark')) {
+      // Safari: keep bili_dark to avoid breaking Bilibili Web Components theme sync
+      const ua = navigator.userAgent
+      const vendor = navigator.vendor
+      const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua) && /Apple/i.test(vendor)
+
+      if (!isSafari && document.documentElement.classList.contains('bili_dark')) {
         document.documentElement.classList.remove('bili_dark')
       }
-      // debug
-      debugTheme('after removing bili_dark (legacy)')
     }
     // else {
     //   if (!document.documentElement.classList.contains('bili_dark')) {
