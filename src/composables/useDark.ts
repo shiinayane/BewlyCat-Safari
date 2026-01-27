@@ -13,61 +13,12 @@ function isFestivalPage(): boolean {
   return /https?:\/\/(?:www\.)?bilibili\.com\/festival\/.*/.test(document.URL)
 }
 
-// debug
-function debugTheme(tag: string) {
-  if (!import.meta.env.DEV)
-    return
-
-  const root = document.documentElement
-  const s = getComputedStyle(root)
-
-  const vars = {
-    bg: s.getPropertyValue('--bg1').trim(),
-    bg2: s.getPropertyValue('--bg2').trim(),
-    text: s.getPropertyValue('--text1').trim(),
-    line: s.getPropertyValue('--line1').trim(),
-  }
-
-  console.debug('[bewly:safari-dark]', tag, {
-    url: location.href,
-    classes: root.className,
-    vars,
-    hasComments: !!document.querySelector('bili-comments'),
-    hasUserProfile: !!document.querySelector('bili-user-profile'),
-  })
-}
-
-let rootClassObserver: MutationObserver | null = null
-function watchRootClassChanges() {
-  if (!import.meta.env.DEV || rootClassObserver)
-    return
-
-  const root = document.documentElement
-  rootClassObserver = new MutationObserver(() => {
-    debugTheme('html.class changed')
-  })
-  rootClassObserver.observe(root, { attributes: true, attributeFilter: ['class'] })
-}
-
-let commentsObserver: MutationObserver | null = null
-function watchCommentsInserted() {
-  if (!import.meta.env.DEV || commentsObserver)
-    return
-
-  commentsObserver = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      for (const node of Array.from(m.addedNodes)) {
-        if (!(node instanceof Element))
-          continue
-        if (node.matches('bili-comments, bili-user-profile')
-          || node.querySelector?.('bili-comments, bili-user-profile')) {
-          debugTheme('comments/profile inserted')
-          return
-        }
-      }
-    }
-  })
-  commentsObserver.observe(document.documentElement, { childList: true, subtree: true })
+// Safari 检测函数
+function isSafariRuntime(): boolean {
+  const ua = navigator.userAgent
+  const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua)
+  const isWebKit = CSS.supports?.('-webkit-backdrop-filter', 'blur(1px)') ?? false
+  return isSafari && isWebKit
 }
 
 /**
@@ -97,12 +48,6 @@ export function useDark() {
   const isDark = computed(() => currentAppColorScheme.value === 'dark')
   let themeChangeTimer: NodeJS.Timeout | null = null
 
-  // 启用DEV
-  if (import.meta.env.DEV) {
-    watchRootClassChanges()
-    watchCommentsInserted()
-  }
-
   // Watch for changes in the 'settings.value.theme' variable and add the 'dark' class to the 'mainApp' element
   // to prevent some Unocss dark-specific styles from failing to take effect
   watch(
@@ -124,7 +69,7 @@ export function useDark() {
     { immediate: true },
   )
 
-  // use watchEffect instead of onMounted because onMounted is only aviailable in setup function
+  // use watchEffect instead of onMounted because onMounted is only available in setup function
   watchEffect(() => {
     // Because some shadow dom may not be loaded when the page has already loaded, we need to wait until the page is idle
     runWhenIdle(() => {
@@ -152,9 +97,6 @@ export function useDark() {
     if (themeChangeTimer)
       clearInterval(themeChangeTimer)
 
-    // debug
-    debugTheme('setAppAppearance: before')
-
     // Check if we should apply selective dark mode (plugin UI only) on festival pages
     const isSelectiveDark = isFestivalPage() && settings.value.adaptToOtherPageStyles
 
@@ -169,9 +111,6 @@ export function useDark() {
         // bili_dark is bilibili's official dark mode class
         document.documentElement.classList.add('bili_dark')
       }
-
-      // debug
-      debugTheme('setAppAppearance: after add classes')
 
       // 确保深色模式基准颜色被正确应用
       setDarkModeBaseColor(settings.value.darkModeBaseColor)
@@ -189,9 +128,6 @@ export function useDark() {
         document.documentElement.classList.remove('bili_dark')
       }
 
-      // debug
-      debugTheme('setAppAppearance: after remove classes')
-
       setCookie('theme_style', 'light', 365 * 10)
       window.dispatchEvent(new CustomEvent('global.themeChange', { detail: 'light' }))
     }
@@ -200,12 +136,8 @@ export function useDark() {
     // It seems like Bilibili already supports dark mode when the `bili_dark` class is added to the `html` element
     // but it's not yet fully refined.
     if (currentAppColorScheme.value === 'dark') {
-      // Safari: keep bili_dark to avoid breaking Bilibili Web Components theme sync
-      const ua = navigator.userAgent
-      const vendor = navigator.vendor
-      const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua) && /Apple/i.test(vendor)
-
-      if (!isSafari && document.documentElement.classList.contains('bili_dark')) {
+      // Safari: keep `bili_dark` to stabilize Bilibili Web Components theme behavior in WebKit.
+      if (!isSafariRuntime() && document.documentElement.classList.contains('bili_dark')) {
         document.documentElement.classList.remove('bili_dark')
       }
     }
@@ -225,7 +157,7 @@ export function useDark() {
     }
 
     const isAppearanceTransition = typeof document !== 'undefined'
-    // @ts-expect-error: Transition API
+      // @ts-expect-error: Transition API
       && document.startViewTransition
       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (!isAppearanceTransition) {
