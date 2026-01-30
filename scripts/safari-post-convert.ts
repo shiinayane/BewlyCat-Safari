@@ -10,7 +10,7 @@ import fs from 'fs-extra'
 const BUNDLE_IDENTIFIER = 'com.github.BewlyCat'
 const APP_GROUP = `group.${BUNDLE_IDENTIFIER}`
 
-const XCODE_PROJECT_DIR = './extension-safari-xcode/BewlyCat'
+const XCODE_PROJECT_DIR = './extension-safari-macos/BewlyCat'
 const APP_DIR = path.join(XCODE_PROJECT_DIR, 'BewlyCat')
 const EXT_DIR = path.join(XCODE_PROJECT_DIR, 'BewlyCat Extension')
 const PBXPROJ_PATH = path.join(XCODE_PROJECT_DIR, 'BewlyCat.xcodeproj/project.pbxproj')
@@ -141,7 +141,7 @@ async function main() {
     console.log('\n✅ Safari post-convert completed!')
     console.log(`   App Group: ${APP_GROUP}`)
     console.log('\n📋 Next steps:')
-    console.log('   1. Open Xcode project: extension-safari-xcode/BewlyCat/BewlyCat.xcodeproj')
+    console.log('   1. Open Xcode project: extension-safari-macos/BewlyCat/BewlyCat.xcodeproj')
     console.log('   2. Configure App Groups in Apple Developer Portal:')
     console.log(`      - Register App Group: ${APP_GROUP}`)
     console.log('      - Enable App Groups capability for both App IDs')
