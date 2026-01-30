@@ -265,13 +265,118 @@ if (window.customElements && isSupportedPage()) {
   })
 }
 
+// Safari 专用：API 请求定义（用于在 MAIN world 中发起请求）
+const SAFARI_API_DEFINITIONS: Record<string, { url: string, method: string, headers?: Record<string, string>, body?: Record<string, any>, params?: Record<string, any> }> = {
+  saveToWatchLater: {
+    url: 'https://api.bilibili.com/x/v2/history/toview/add',
+    method: 'post',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: { aid: 0, bvid: '', csrf: '' },
+  },
+  removeFromWatchLater: {
+    url: 'https://api.bilibili.com/x/v2/history/toview/del',
+    method: 'post',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: { viewed: false, csrf: '' },
+    params: { aid: 0 },
+  },
+  getAllWatchLaterList: {
+    url: 'https://api.bilibili.com/x/v2/history/toview',
+    method: 'get',
+  },
+  getWatchLaterListByPage: {
+    url: 'https://api.bilibili.com/x/v2/history/toview/web',
+    method: 'get',
+    params: { pn: 1, ps: 20 },
+  },
+  clearAllWatchLater: {
+    url: 'https://api.bilibili.com/x/v2/history/toview/clear',
+    method: 'post',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: { csrf: '' },
+  },
+}
+
+/**
+ * Safari 专用：在 MAIN world 中执行 API 请求
+ * 这样请求的 Origin 是 bilibili.com，会自动携带 Cookie
+ */
+async function executeApiRequest(apiName: string, options?: Record<string, any>): Promise<any> {
+  const apiDef = SAFARI_API_DEFINITIONS[apiName]
+  if (!apiDef) {
+    throw new Error(`Unknown API: ${apiName}`)
+  }
+
+  const { url, method, headers = {}, body = {}, params = {} } = apiDef
+
+  // 合并参数
+  const targetParams = { ...params }
+  const targetBody = { ...body }
+  const opts = options || {}
+
+  Object.keys(opts).forEach((key) => {
+    if (body && key in body) {
+      targetBody[key] = opts[key]
+    }
+    else {
+      targetParams[key] = opts[key]
+    }
+  })
+
+  // 构建 URL
+  let requestUrl = url
+  const isGET = method.toLowerCase() === 'get'
+
+  if (Object.keys(targetParams).length) {
+    const urlParams = new URLSearchParams()
+    for (const key in targetParams) {
+      const value = targetParams[key]
+      if (value !== undefined && value !== null && value !== '') {
+        urlParams.append(key, String(value))
+      }
+    }
+    requestUrl += `?${urlParams.toString()}`
+  }
+
+  // 构建 body
+  let requestBody: string | null = null
+  if (!isGET && Object.keys(targetBody).length) {
+    if (headers['Content-Type']?.includes('application/x-www-form-urlencoded')) {
+      const bodyParams = new URLSearchParams()
+      for (const key in targetBody) {
+        const value = targetBody[key]
+        if (value !== undefined && value !== null && value !== '') {
+          bodyParams.append(key, String(value))
+        }
+      }
+      requestBody = bodyParams.toString()
+    }
+    else {
+      requestBody = JSON.stringify(targetBody)
+    }
+  }
+
+  // 发起请求
+  const fetchOpt: RequestInit = {
+    method,
+    headers,
+    credentials: 'include',
+  }
+  if (!isGET && requestBody) {
+    fetchOpt.body = requestBody
+  }
+
+  const response = await fetch(requestUrl, fetchOpt)
+  return response.json()
+}
+
 // 添加消息监听器
 window.addEventListener('message', (event) => {
   // 确保消息来源是插件环境
   if (event.source !== window)
     return
 
-  const { type, data } = event.data
+  const { type, data, requestId, apiName, options } = event.data
 
   // 处理来自插件环境的消息
   if (type === 'BEWLY_SETTINGS_UPDATE') {
@@ -286,6 +391,25 @@ window.addEventListener('message', (event) => {
         console.log('[AudioInterceptor] 音量均衡已启用')
       }
     }
+  }
+
+  // Safari 专用：处理 API 请求
+  if (type === 'BEWLY_API_REQUEST' && requestId && apiName) {
+    executeApiRequest(apiName, options)
+      .then((result) => {
+        window.postMessage({
+          type: 'BEWLY_API_RESPONSE',
+          requestId,
+          data: result,
+        }, '*')
+      })
+      .catch((error) => {
+        window.postMessage({
+          type: 'BEWLY_API_RESPONSE',
+          requestId,
+          error: error.message || 'Unknown error',
+        }, '*')
+      })
   }
 })
 
