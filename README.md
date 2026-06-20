@@ -1,5 +1,23 @@
 # BewlyCat
 
+> [!IMPORTANT]
+> ⚠️ **BewlyCat-Safari（Fork 说明）**
+>
+> 本项目 **BewlyCat-Safari** 是从 **BewlyCat / BewlyBewly** fork 的 Safari 专用维护版本，
+> 主要目标是修复和适配 Safari（macOS）环境下的兼容性问题。
+>
+> - 原项目的历史贡献者与许可证信息已完整保留（MIT License）
+> - BewlyCat 上游项目 **不保证** 对 Safari 的完整兼容、测试或持续支持
+> - Safari 相关的问题与适配由本仓库单独维护
+>
+> **反馈说明：**
+>
+> - 通用功能建议 / 与浏览器无关的问题：请优先反馈至 BewlyCat 上游仓库
+> - Safari 专属问题（兼容性、异常行为等）：请在本仓库提交 issue
+>
+> 个人打包请使用 Xcode 打开 `extension-safari-macos/BewlyCat/BewlyCat.xcodeproj` 项目文件
+> 并构建运行，请勿分发。
+
 ![GitHub Release](https://img.shields.io/github/v/release/keleus/BewlyCat?label=Github) ![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/oopkfefbgecikmfbbapnlpjidoomhjpl?label=Chrome) ![Edge Addons Version](https://img.shields.io/badge/dynamic/json?color=blue&label=Edge&query=%24.version&url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Faaammfjdfifgnfnbflolojihjfhdploj&prefix=v) ![Firefox Version](https://img.shields.io/amo/v/bewlycat?label=Firefox)
 
 ![Github Downloads](https://img.shields.io/github/downloads/keleus/BewlyCat/total?label=Github%20Downloads) ![Chrome Web Store Users](https://img.shields.io/chrome-web-store/users/oopkfefbgecikmfbbapnlpjidoomhjpl?label=Chrome%20Users) ![Edge Addons Users](https://img.shields.io/badge/dynamic/json?label=Edge%20Users&query=%24.activeInstallCount&url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Faaammfjdfifgnfnbflolojihjfhdploj) ![Firefox Users](https://img.shields.io/amo/users/bewlycat?label=Firefox%20Users)
