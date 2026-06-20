@@ -8,6 +8,10 @@ import { executeTimes } from '~/utils/timer'
 
 const currentUrl = ref(typeof location === 'undefined' ? '' : location.href)
 let isRouteWatcherStarted = false
+// 评论区主题同步的 MutationObserver 提升为模块级单例：useDark() 在多个组件中
+// 被调用（约 12 处），若放在函数内会在 Safari 暗黑模式下创建多个全量监听整个
+// 文档子树的 observer，造成不必要的开销。
+let commentThemeObserver: MutationObserver | null = null
 
 /**
  * Check if current page is festival page
@@ -119,7 +123,6 @@ export function useDark() {
   const isDark = computed(() => currentAppColorScheme.value === 'dark' || isVideoPageDark.value)
   let themeChangeTimer: NodeJS.Timeout | null = null
   let wasDark = false
-  let commentThemeObserver: MutationObserver | null = null
   const shouldSyncBiliCommentsTheme = isSafariRuntime()
 
   // Watch for changes in the 'settings.value.theme' variable and add the 'dark' class to the 'mainApp' element
