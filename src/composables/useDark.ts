@@ -71,8 +71,8 @@ function collectCssVariablesByPrefixes(
   return variables
 }
 
-function syncCommentsThemeVariables(targets?: Element[]) {
-  const hosts = targets ?? Array.from(document.querySelectorAll('bili-comments, bili-user-profile'))
+function syncCommentsThemeVariables(targets?: HTMLElement[]) {
+  const hosts = targets ?? Array.from(document.querySelectorAll<HTMLElement>('bili-comments, bili-user-profile'))
   if (!hosts.length)
     return
   const rootStyle = getComputedStyle(document.documentElement)
@@ -87,7 +87,7 @@ function syncCommentsThemeVariables(targets?: Element[]) {
 }
 
 function clearCommentsThemeVariables() {
-  const hosts = Array.from(document.querySelectorAll('bili-comments, bili-user-profile'))
+  const hosts = Array.from(document.querySelectorAll<HTMLElement>('bili-comments, bili-user-profile'))
   if (!hosts.length)
     return
   const rootStyle = getComputedStyle(document.documentElement)
@@ -231,14 +231,14 @@ export function useDark() {
         commentThemeObserver = new MutationObserver((mutations) => {
           if (!isDark.value)
             return
-          const hosts: Element[] = []
+          const hosts: HTMLElement[] = []
           mutations.forEach((mutation) => {
             mutation.addedNodes.forEach((node) => {
-              if (!(node instanceof Element))
+              if (!(node instanceof HTMLElement))
                 return
               if (node.matches('bili-comments, bili-user-profile'))
                 hosts.push(node)
-              node.querySelectorAll?.('bili-comments, bili-user-profile').forEach((el) => {
+              node.querySelectorAll<HTMLElement>('bili-comments, bili-user-profile').forEach((el) => {
                 hosts.push(el)
               })
             })
