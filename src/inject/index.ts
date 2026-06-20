@@ -1,6 +1,7 @@
 // 由于是浏览器环境，所以引入的ts不能使用webextension-polyfill相关api，包含获取本地Storage，获取的是网页的localStorage
 import { PAGE_NO_COOKIE_SEARCH_REQUEST, PAGE_NO_COOKIE_SEARCH_RESPONSE } from '~/constants/api'
 import type { Settings } from '~/logic/storage'
+import { hasClipboardWrite } from '~/utils/clipboard'
 import { isElectron } from '~/utils/main'
 
 // 存储当前设置状态
@@ -387,13 +388,189 @@ else {
     })
   }
 
+  // Safari 专用：API 请求定义（用于在 MAIN world 中发起请求）
+  const SAFARI_API_DEFINITIONS: Record<string, { url: string, method: string, headers?: Record<string, string>, body?: Record<string, any>, params?: Record<string, any> }> = {
+    logout: {
+      url: 'https://passport.bilibili.com/login/exit/v2',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { biliCSRF: '' },
+      params: { biliCSRF: '' },
+    },
+    saveToWatchLater: {
+      url: 'https://api.bilibili.com/x/v2/history/toview/add',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { aid: 0, bvid: '', csrf: '' },
+    },
+    removeFromWatchLater: {
+      url: 'https://api.bilibili.com/x/v2/history/toview/del',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { viewed: false, csrf: '' },
+      params: { aid: 0 },
+    },
+    getAllWatchLaterList: {
+      url: 'https://api.bilibili.com/x/v2/history/toview',
+      method: 'get',
+    },
+    getWatchLaterListByPage: {
+      url: 'https://api.bilibili.com/x/v2/history/toview/web',
+      method: 'get',
+      params: { pn: 1, ps: 20 },
+    },
+    clearAllWatchLater: {
+      url: 'https://api.bilibili.com/x/v2/history/toview/clear',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { csrf: '' },
+    },
+    deleteHistoryItem: {
+      url: 'https://api.bilibili.com/x/v2/history/delete',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { kid: '', csrf: '' },
+    },
+    clearAllHistory: {
+      url: 'https://api.bilibili.com/x/v2/history/clear',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { csrf: '' },
+    },
+    setHistoryPauseStatus: {
+      url: 'https://api.bilibili.com/x/v2/history/shadow/set',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { switch: false, csrf: '' },
+    },
+    patchDelFavoriteResources: {
+      url: 'https://api.bilibili.com/x/v3/fav/resource/batch-del',
+      method: 'post',
+      params: { resources: '', media_id: 0, csrf: '' },
+    },
+    webDislikeVideo: {
+      url: 'https://api.bilibili.com/x/web-interface/feedback/dislike',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: {
+        app_id: 100,
+        platform: 5,
+        from_spmid: '',
+        spmid: '333.1007.0.0',
+        goto: 'av',
+        id: 0,
+        mid: 0,
+        track_id: '',
+        feedback_page: 1,
+        reason_id: 1,
+        csrf: '',
+      },
+    },
+    relationModify: {
+      url: 'https://api.bilibili.com/x/relation/modify',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { fid: '', act: 1, re_src: 11, csrf: '' },
+    },
+    exchangeCoupon: {
+      url: 'https://api.bilibili.com/x/vip/privilege/receive',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { type: '1', csrf: '' },
+    },
+    receiveVipExp: {
+      url: 'https://api.bilibili.com/x/vip/experience/add',
+      method: 'post',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: { csrf: '' },
+    },
+  }
+
+  /**
+   * Safari 专用：在 MAIN world 中执行 API 请求
+   * 这样请求的 Origin 是 bilibili.com，会自动携带 Cookie
+   */
+  async function executeApiRequest(apiName: string, options?: Record<string, any>): Promise<any> {
+    const apiDef = SAFARI_API_DEFINITIONS[apiName]
+    if (!apiDef) {
+      throw new Error(`Unknown API: ${apiName}`)
+    }
+
+    const { url, method, headers = {}, body = {}, params = {} } = apiDef
+
+    // 合并参数
+    const targetParams = { ...params }
+    const targetBody = { ...body }
+    const opts = options || {}
+
+    Object.keys(opts).forEach((key) => {
+      if (body && key in body) {
+        targetBody[key] = opts[key]
+      }
+      else {
+        targetParams[key] = opts[key]
+      }
+    })
+
+    // 构建 URL
+    let requestUrl = url
+    const isGET = method.toLowerCase() === 'get'
+
+    if (Object.keys(targetParams).length) {
+      const urlParams = new URLSearchParams()
+      for (const key in targetParams) {
+        const value = targetParams[key]
+        if (value !== undefined && value !== null && value !== '') {
+          urlParams.append(key, String(value))
+        }
+      }
+      requestUrl += `?${urlParams.toString()}`
+    }
+
+    // 构建 body
+    let requestBody: string | null = null
+    if (!isGET && Object.keys(targetBody).length) {
+      if (headers['Content-Type']?.includes('application/x-www-form-urlencoded')) {
+        const bodyParams = new URLSearchParams()
+        for (const key in targetBody) {
+          const value = targetBody[key]
+          if (value !== undefined && value !== null && value !== '') {
+            bodyParams.append(key, String(value))
+          }
+        }
+        requestBody = bodyParams.toString()
+      }
+      else {
+        requestBody = JSON.stringify(targetBody)
+      }
+    }
+
+    // 发起请求
+    const fetchOpt: RequestInit = {
+      method,
+      headers,
+      credentials: 'include',
+    }
+    if (!isGET && requestBody) {
+      fetchOpt.body = requestBody
+    }
+
+    const response = await fetch(requestUrl, fetchOpt)
+    return response.json()
+  }
+
   // 添加消息监听器
   window.addEventListener('message', (event) => {
   // 确保消息来源是插件环境
     if (event.source !== window)
       return
 
-    const { type, data } = event.data
+    // 页面或第三方脚本可能向自身 postMessage 非对象数据（如 null、字符串、数字），
+    // 直接解构会抛出 TypeError，这里先做类型守卫。
+    if (!event.data || typeof event.data !== 'object')
+      return
+
+    const { type, data, requestId, apiName, options } = event.data
 
     // 处理来自插件环境的消息
     if (type === 'BEWLY_SETTINGS_UPDATE') {
@@ -410,6 +587,25 @@ else {
           console.log('[AudioInterceptor] 音量均衡已启用')
         }
       }
+    }
+
+    // Safari 专用：处理 API 请求
+    if (type === 'BEWLY_API_REQUEST' && requestId && apiName) {
+      executeApiRequest(apiName, options)
+        .then((result) => {
+          window.postMessage({
+            type: 'BEWLY_API_RESPONSE',
+            requestId,
+            data: result,
+          }, '*')
+        })
+        .catch((error) => {
+          window.postMessage({
+            type: 'BEWLY_API_RESPONSE',
+            requestId,
+            error: error.message || 'Unknown error',
+          }, '*')
+        })
     }
   })
 
@@ -601,21 +797,28 @@ else {
   }
 
   // Intercept navigator.clipboard.writeText to enable clean share link feature
-  const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard)
-  navigator.clipboard.writeText = function (text: string) {
-    if (!currentSettings?.enableCleanShareLink)
-      return originalWriteText(text)
+  if (hasClipboardWrite(navigator.clipboard)) {
+    try {
+      const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard)
+      navigator.clipboard.writeText = function (text: string) {
+        if (!currentSettings?.enableCleanShareLink)
+          return originalWriteText(text)
 
-    const isBilibiliShare = /【.+?】\s*https?:\/\//.test(text)
-    const hasBilibiliUrl = /https?:\/\/(?:www\.)?bilibili\.com\//.test(text) || /https?:\/\/b23\.tv\//.test(text)
+        const isBilibiliShare = /【.+?】\s*https?:\/\//.test(text)
+        const hasBilibiliUrl = /https?:\/\/(?:www\.)?bilibili\.com\//.test(text) || /https?:\/\/b23\.tv\//.test(text)
 
-    if (isBilibiliShare || hasBilibiliUrl) {
-      const includeTitle = currentSettings?.cleanShareLinkIncludeTitle ?? false
-      const removeTracking = currentSettings?.cleanShareLinkRemoveTrackingParams !== false
-      const cleanedText = cleanShareText(text, includeTitle, removeTracking)
-      return originalWriteText(cleanedText)
+        if (isBilibiliShare || hasBilibiliUrl) {
+          const includeTitle = currentSettings?.cleanShareLinkIncludeTitle ?? false
+          const removeTracking = currentSettings?.cleanShareLinkRemoveTrackingParams !== false
+          const cleanedText = cleanShareText(text, includeTitle, removeTracking)
+          return originalWriteText(cleanedText)
+        }
+
+        return originalWriteText(text)
+      }
     }
-
-    return originalWriteText(text)
+    catch (error) {
+      console.warn('[BewlyCat] Failed to patch clipboard.writeText:', error)
+    }
   }
 }

@@ -3,6 +3,7 @@ import { settings } from '~/logic'
 import type { AutoPlayMode, DefaultVideoPlayerMode } from '~/logic/storage'
 
 import { applyVolumeNormalization } from './audioNormalization'
+import { toggleVideoPictureInPicture } from './pictureInPicture'
 
 const _videoClassTag = {
   danmuBtn:
@@ -726,17 +727,13 @@ export function toggleMute(player: Element) {
 // 切换画中画
 export async function togglePictureInPicture() {
   const video = getVideoElement()
-  if (video && document.pictureInPictureEnabled && !video.disablePictureInPicture && video.readyState !== 0) {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen()
-    }
-
-    if (document.pictureInPictureElement) {
-      document.exitPictureInPicture()
-    }
-    else {
-      video.requestPictureInPicture()
-    }
+  try {
+    const toggled = await toggleVideoPictureInPicture(video)
+    if (!toggled)
+      console.warn('[BewlyCat] Picture-in-picture is not available in this browser context.')
+  }
+  catch (error) {
+    console.warn('[BewlyCat] Failed to toggle picture-in-picture:', error)
   }
 }
 
