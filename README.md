@@ -119,6 +119,73 @@
 
 </details>
 
+#### Safari (macOS)
+
+> 需要安装 Xcode（Mac App Store 免费下载），Apple Developer 免费账号即可。
+
+<details>
+ <summary> 展开 Safari 构建与安装步骤 </summary>
+
+##### 前置环境
+
+```bash
+# 确保安装了 Xcode 和 Node.js（推荐 v18+）
+# 在项目根目录安装依赖
+pnpm install
+```
+
+##### 步骤一：构建 Web 扩展
+
+```bash
+pnpm build-safari
+```
+
+生成 Web 扩展包到 `extension-safari/` 目录。
+
+##### 步骤二：转换为 Xcode 项目
+
+```bash
+pnpm convert-safari
+```
+
+运行 Apple 的 `safari-web-extension-converter`，生成 Xcode 项目到 `extension-safari-macos/`。
+
+##### 步骤三：添加 App Groups 授权（可选）
+
+```bash
+npx esno scripts/safari-post-convert.ts
+```
+
+添加 App Groups entitlements，使扩展的存储设置在 Safari 重启后仍能保留。首次配置可选择跳过此步骤。
+
+##### 步骤四：在 Xcode 中签名并运行
+
+```bash
+open extension-safari-macos/BewlyCat/BewlyCat.xcodeproj
+```
+
+在 Xcode 中：
+
+1. 在项目导航栏选中 `BewlyCat` 项目
+2. 进入 **Signing & Capabilities** 选项卡
+3. 在 **Team** 下拉菜单中选择你的 Apple Developer 团队（免费账号即可）
+4. 同样的操作为 `BewlyCat Extension` Target 也设置 Team
+5. 按 **Cmd+R** 构建并运行
+6. Safari 会自动打开并提示启用扩展
+
+##### 步骤五：启用扩展
+
+1. 打开 **Safari → 设置 → 扩展**
+2. 勾选 **BewlyCat**
+3. 访问 `https://www.bilibili.com` 即可看到效果
+
+> **提示：**
+> - 如果需要配对的 iOS 设备，也可以在 Xcode 中选择 macOS 目标
+> - 如果遇到签名错误，检查 `extension-safari-macos/BewlyCat/BewlyCat.xcodeproj` 中的 Teams 是否正确设置
+> - 构建产物 `extension-safari/` 和 `extension-safari-macos/` 已加入 `.gitignore`，不会提交到仓库
+
+</details>
+
 ## 🤝 构建项目参考
 
 查看 [CONTRIBUTING.md](docs/CONTRIBUTING-cmn_CN.md)
