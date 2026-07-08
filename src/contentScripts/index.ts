@@ -236,6 +236,13 @@ else {
       return
     }
 
+    // 后台新开的标签页中，B 站播放器还没有完成可见状态下的初始化。
+    // 此时切换播放器模式会与它的恢复流程竞争，可能导致媒体重载或重复 video 节点。
+    if (document.hidden) {
+      clearPlayerModeRetry()
+      return
+    }
+
     if (hasAppliedPlayerMode)
       return // 如果已经应用过，直接返回
 
@@ -500,7 +507,7 @@ else {
       applyDefaultPlayerMode()
     }
   })
-  window.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 
   // Set the original Bilibili top bar to `display: none` to prevent it from showing before the load
   // see: https://github.com/BewlyBewly/BewlyBewly/issues/967
@@ -585,9 +592,10 @@ else {
     if (removeOriginalTopBar)
       document.documentElement.removeChild(removeOriginalTopBar)
 
-    // Initialize Audio Interceptor
-    initAudioInterceptor()
+    // Initialize Audio Interceptor only when volume normalization is enabled.
     setupSettingsWatcher()
+    if (settings.value.enableVolumeNormalization)
+      initAudioInterceptor()
     initVolumeNormalizationControl()
 
     // Initialize Favorite Dialog Enhancement (for video pages)

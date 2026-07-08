@@ -242,6 +242,7 @@ export interface Settings {
   disableDockGlowingEffect: boolean
   disableLightDarkModeSwitcherOnDock: boolean
   backToTopAndRefreshButtonsAreSeparated: boolean
+  alwaysShowDockActionsWhenAutoHide: boolean
   enableUndoRefreshButton: boolean // 添加撤销刷新按钮配置项
 
   sidebarPosition: 'left' | 'right'
@@ -312,6 +313,7 @@ export interface Settings {
 
   homePageTabVisibilityList: { page: HomeSubPage, visible: boolean }[]
   alwaysShowTabsOnHomePage: boolean
+  fixedHomeTabsOnHomePage: boolean
   // Title font size for cards (px); when auto is enabled, this is ignored
   homeAdaptiveTitleFontSize: number
   // Auto adjust title font size based on grid width
@@ -464,6 +466,7 @@ export const originalSettings: Settings = {
   disableDockGlowingEffect: false,
   disableLightDarkModeSwitcherOnDock: false,
   backToTopAndRefreshButtonsAreSeparated: true,
+  alwaysShowDockActionsWhenAutoHide: false,
   enableUndoRefreshButton: true, // 默认开启撤销刷新按钮
 
   sidebarPosition: 'right',
@@ -534,6 +537,7 @@ export const originalSettings: Settings = {
 
   homePageTabVisibilityList: [],
   alwaysShowTabsOnHomePage: false,
+  fixedHomeTabsOnHomePage: false,
   homeAdaptiveTitleFontSize: 16,
   homeAdaptiveTitleAutoSize: true,
   videoCardTitleFontSize: 'base',

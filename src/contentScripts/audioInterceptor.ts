@@ -135,7 +135,7 @@ const pendingMetadataVideos = new WeakSet<HTMLVideoElement>()
 let hasAttached = false
 let interceptorTimer: ReturnType<typeof setInterval> | null = null
 let hasSetupSettingsWatcher = false
-let hasSetupVisibilityListener = false
+let visibilityChangeHandler: (() => void) | null = null
 let shouldResetAnalysisOnNextPlayback = false
 
 // 临时启用/禁用状态（用于播放器控件）
@@ -410,6 +410,24 @@ function getActiveVideoElement(): HTMLVideoElement | null {
     return document.querySelector('video')
   }
 
+  if (currentVideoElement
+    && candidates.includes(currentVideoElement)
+    && isPlaybackActive(currentVideoElement)) {
+    return currentVideoElement
+  }
+
+  const playingVideo = candidates.find(video => isVisibleVideo(video) && !video.paused && !video.ended)
+    || candidates.find(video => !video.paused && !video.ended)
+
+  if (playingVideo)
+    return playingVideo
+
+  // Visibility changes can briefly report the bound video as paused. Prefer the
+  // existing element in that transition instead of attaching to another idle
+  // video node and rebuilding the Web Audio graph.
+  if (currentVideoElement && candidates.includes(currentVideoElement))
+    return currentVideoElement
+
   return candidates.find(video => isVisibleVideo(video) && !video.ended)
     || candidates.find(isVisibleVideo)
     || candidates[0]
@@ -636,6 +654,11 @@ export function attachToVideo(video: HTMLVideoElement) {
     return
   }
 
+  // 后台加载时播放器可能仍在替换临时 video，等标签页可见后再绑定 Web Audio。
+  if (document.hidden) {
+    return
+  }
+
   if (!video.isConnected) {
     return
   }
@@ -722,8 +745,22 @@ function isVideoPage(): boolean {
     || path.startsWith('/cheese/play/')
 }
 
+function stopAudioInterceptor() {
+  if (interceptorTimer) {
+    clearInterval(interceptorTimer)
+    interceptorTimer = null
+  }
+
+  if (visibilityChangeHandler) {
+    document.removeEventListener('visibilitychange', visibilityChangeHandler)
+    visibilityChangeHandler = null
+  }
+
+  stopLoudnessAnalysis()
+}
+
 export function initAudioInterceptor() {
-  if (interceptorTimer)
+  if (interceptorTimer || !settings.value.enableVolumeNormalization)
     return
 
   if (isVideoPage()) {
@@ -732,19 +769,28 @@ export function initAudioInterceptor() {
 
   let lastUrl = location.href
 
-  if (!hasSetupVisibilityListener) {
-    hasSetupVisibilityListener = true
-    document.addEventListener('visibilitychange', () => {
-      if (!isPlaybackActive(currentVideoElement))
-        return
-
+  if (!visibilityChangeHandler) {
+    visibilityChangeHandler = () => {
       if (document.hidden) {
-        suspendProcessingForIdlePlayback()
+        if (currentVideoElement)
+          suspendProcessingForIdlePlayback()
+        return
       }
-      else {
+
+      // Returning to a tab must not reselect and reattach an already-bound
+      // video. Browsers may expose a transient paused state during this event,
+      // while Bilibili can keep additional idle video elements in the player.
+      if (hasAttached && currentVideoElement?.isConnected && audioNodes) {
         updateProcessingState()
+        return
       }
-    })
+
+      const video = getActiveVideoElement()
+      if (video) {
+        attachToVideo(video)
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityChangeHandler)
   }
 
   interceptorTimer = setInterval(() => {
@@ -765,7 +811,7 @@ export function initAudioInterceptor() {
       return
     }
 
-    if (hasAttached && currentVideoElement?.isConnected && !urlChanged) {
+    if (document.hidden) {
       return
     }
 
@@ -800,13 +846,16 @@ export function setupSettingsWatcher() {
     log('Settings changed: enableVolumeNormalization =', newVal)
 
     if (newVal) {
+      initAudioInterceptor()
       const video = getActiveVideoElement()
-      if (video) {
+      if (video && !document.hidden) {
         attachToVideo(video)
       }
     }
-    else if (currentVideoElement) {
-      updateProcessingState()
+    else {
+      if (audioNodes && audioContext)
+        connectBypassGraph()
+      stopAudioInterceptor()
     }
   })
 

@@ -333,6 +333,7 @@ settings:
   disable_dock_glowing_effect: 关闭 Dock 栏发光效果
   disable_light_dark_mode_switcher: 禁用亮/暗色模式切换按钮
   back_to_top_and_refresh_buttons_are_separated: 分离回到顶部和刷新按钮
+  always_show_dock_actions_when_auto_hide: 自动隐藏 Dock 栏时始终显示操作按钮
   sidebar_position: 侧边栏位置
   auto_hide_sidebar: 自动隐藏侧边栏
   theme: 主题
@@ -455,6 +456,7 @@ settings:
   home_tabs_adjustment: 标签栏调整
   home_tabs_adjustment_desc: 第一个激活的标签项是默认界面
   always_show_tabs_on_home_page: 滚动隐藏首页标签栏
+  fixed_home_tabs_on_home_page: 固定首页标签栏
   topbar_visibility: 顶栏可见性
   topbar_visibility_desc: 如果您正在使用 Bilibili Evolved 的顶栏，您可以在这里关闭 BewlyCat 的顶栏。
   use_original_bilibili_homepage: 使用原版 Bilibili 首页
