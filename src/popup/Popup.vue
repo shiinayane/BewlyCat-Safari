@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import Logo from '~/components/Logo.vue'
-import { openExtensionOptionsPage } from '~/utils/extensionPage'
 
 function openOptionsPage() {
-  void openExtensionOptionsPage(browser)
+  browser.runtime.openOptionsPage()
 }
 </script>
 

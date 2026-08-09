@@ -4,28 +4,17 @@ import { DARK_MODE_BASE_COLOR_CHANGE } from '~/constants/globalEvents'
 import { settings } from '~/logic'
 import { runWhenIdle } from '~/utils/lazyLoad'
 import { isVideoPlaybackPage, setCookie } from '~/utils/main'
+import { updateSafariCommentTheme } from '~/utils/safariCommentTheme'
 import { executeTimes } from '~/utils/timer'
 
 const currentUrl = ref(typeof location === 'undefined' ? '' : location.href)
 let isRouteWatcherStarted = false
-// 评论区主题同步的 MutationObserver 提升为模块级单例：useDark() 在多个组件中
-// 被调用（约 12 处），若放在函数内会在 Safari 暗黑模式下创建多个全量监听整个
-// 文档子树的 observer，造成不必要的开销。
-let commentThemeObserver: MutationObserver | null = null
 
 /**
  * Check if current page is festival page
  */
 function isFestivalPage(): boolean {
   return /https?:\/\/(?:www\.)?bilibili\.com\/festival\/.*/.test(document.URL)
-}
-
-function isSafariRuntime(): boolean {
-  const ua = navigator.userAgent
-  const vendor = navigator.vendor
-  const isSafari = /Safari/i.test(ua)
-  const isChromeLike = /Chrome|Chromium|Edg/i.test(ua)
-  return isSafari && !isChromeLike && /Apple/i.test(vendor)
 }
 
 function startRouteWatcher() {
@@ -59,53 +48,6 @@ function setDarkModeBaseColor(color: string) {
   }
 }
 
-function collectCssVariablesByPrefixes(
-  style: CSSStyleDeclaration,
-  prefixes: string[],
-): Record<string, string> {
-  const variables: Record<string, string> = {}
-  for (let i = 0; i < style.length; i += 1) {
-    const name = style[i]
-    if (!prefixes.some(prefix => name.startsWith(prefix)))
-      continue
-    const value = style.getPropertyValue(name).trim()
-    if (value)
-      variables[name] = value
-  }
-  return variables
-}
-
-function syncCommentsThemeVariables(targets?: HTMLElement[]) {
-  const hosts = targets ?? Array.from(document.querySelectorAll<HTMLElement>('bili-comments, bili-user-profile'))
-  if (!hosts.length)
-    return
-  const rootStyle = getComputedStyle(document.documentElement)
-  const variables = collectCssVariablesByPrefixes(rootStyle, ['--bg', '--text', '--graph', '--line'])
-  if (!Object.keys(variables).length)
-    return
-  hosts.forEach((host) => {
-    Object.entries(variables).forEach(([name, value]) => {
-      host.style.setProperty(name, value)
-    })
-  })
-}
-
-function clearCommentsThemeVariables() {
-  const hosts = Array.from(document.querySelectorAll<HTMLElement>('bili-comments, bili-user-profile'))
-  if (!hosts.length)
-    return
-  const rootStyle = getComputedStyle(document.documentElement)
-  const variables = collectCssVariablesByPrefixes(rootStyle, ['--bg', '--text', '--graph', '--line'])
-  const variableNames = Object.keys(variables)
-  if (!variableNames.length)
-    return
-  hosts.forEach((host) => {
-    variableNames.forEach((name) => {
-      host.style.removeProperty(name)
-    })
-  })
-}
-
 export function useDark() {
   startRouteWatcher()
 
@@ -122,8 +64,6 @@ export function useDark() {
   })
   const isDark = computed(() => currentAppColorScheme.value === 'dark' || isVideoPageDark.value)
   let themeChangeTimer: NodeJS.Timeout | null = null
-  let wasDark = false
-  const shouldSyncBiliCommentsTheme = isSafariRuntime()
 
   // Watch for changes in the 'settings.value.theme' variable and add the 'dark' class to the 'mainApp' element
   // to prevent some Unocss dark-specific styles from failing to take effect
@@ -192,9 +132,6 @@ export function useDark() {
       // 确保深色模式基准颜色被正确应用
       setDarkModeBaseColor(settings.value.darkModeBaseColor)
 
-      if (shouldSyncBiliCommentsTheme)
-        syncCommentsThemeVariables()
-
       setCookie('theme_style', 'dark', 365 * 10)
       window.dispatchEvent(new CustomEvent('global.themeChange', { detail: 'dark' }))
     }
@@ -208,12 +145,11 @@ export function useDark() {
         document.documentElement.classList.remove('bili_dark')
       }
 
-      if (shouldSyncBiliCommentsTheme)
-        clearCommentsThemeVariables()
-
       setCookie('theme_style', 'light', 365 * 10)
       window.dispatchEvent(new CustomEvent('global.themeChange', { detail: 'light' }))
     }
+
+    updateSafariCommentTheme(isDark.value)
 
     // Only used as a temporary solution, which will eventually be removed
     // It seems like Bilibili already supports dark mode when the `bili_dark` class is added to the `html` element
@@ -228,37 +164,6 @@ export function useDark() {
     //     document.documentElement.classList.add('bili_dark')
     //   }
     // }
-
-    if (isDark.value && !wasDark && shouldSyncBiliCommentsTheme) {
-      if (!commentThemeObserver) {
-        commentThemeObserver = new MutationObserver((mutations) => {
-          if (!isDark.value)
-            return
-          const hosts: HTMLElement[] = []
-          mutations.forEach((mutation) => {
-            mutation.addedNodes.forEach((node) => {
-              if (!(node instanceof HTMLElement))
-                return
-              if (node.matches('bili-comments, bili-user-profile'))
-                hosts.push(node)
-              node.querySelectorAll<HTMLElement>('bili-comments, bili-user-profile').forEach((el) => {
-                hosts.push(el)
-              })
-            })
-          })
-          if (hosts.length)
-            syncCommentsThemeVariables(hosts)
-        })
-        commentThemeObserver.observe(document.documentElement, { childList: true, subtree: true })
-      }
-    }
-
-    if (!isDark.value && commentThemeObserver && shouldSyncBiliCommentsTheme) {
-      commentThemeObserver.disconnect()
-      commentThemeObserver = null
-    }
-
-    wasDark = isDark.value
   }
 
   function toggleDark(e: MouseEvent) {

@@ -150,15 +150,7 @@ pnpm convert-safari
 
 运行 Apple 的 `safari-web-extension-converter`，生成 Xcode 项目到 `extension-safari-macos/`。
 
-##### 步骤三：添加 App Groups 授权（可选）
-
-```bash
-npx esno scripts/safari-post-convert.ts
-```
-
-添加 App Groups entitlements，使扩展的存储设置在 Safari 重启后仍能保留。首次配置可选择跳过此步骤。
-
-##### 步骤四：在 Xcode 中签名并运行
+##### 步骤三：在 Xcode 中签名并运行
 
 ```bash
 open extension-safari-macos/BewlyCat/BewlyCat.xcodeproj
@@ -173,7 +165,7 @@ open extension-safari-macos/BewlyCat/BewlyCat.xcodeproj
 5. 按 **Cmd+R** 构建并运行
 6. Safari 会自动打开并提示启用扩展
 
-##### 步骤五：启用扩展
+##### 步骤四：启用扩展
 
 1. 打开 **Safari → 设置 → 扩展**
 2. 勾选 **BewlyCat**
