@@ -1,5 +1,23 @@
 # BewlyCat
 
+> [!IMPORTANT]
+> ⚠️ **BewlyCat-Safari（Fork 说明）**
+>
+> 本项目 **BewlyCat-Safari** 是从 **BewlyCat / BewlyBewly** fork 的 Safari 专用维护版本，
+> 主要目标是修复和适配 Safari（macOS）环境下的兼容性问题。
+>
+> - 原项目的历史贡献者与许可证信息已完整保留（MIT License）
+> - BewlyCat 上游项目 **不保证** 对 Safari 的完整兼容、测试或持续支持
+> - Safari 相关的问题与适配由本仓库单独维护
+>
+> **反馈说明：**
+>
+> - 通用功能建议 / 与浏览器无关的问题：请优先反馈至 BewlyCat 上游仓库
+> - Safari 专属问题（兼容性、异常行为等）：请在本仓库提交 issue
+>
+> 个人打包请使用 Xcode 打开 `extension-safari-macos/BewlyCat/BewlyCat.xcodeproj` 项目文件
+> 并构建运行，请勿分发。
+
 ![GitHub Release](https://img.shields.io/github/v/release/keleus/BewlyCat?label=Github) ![Chrome Web Store Version](https://img.shields.io/chrome-web-store/v/oopkfefbgecikmfbbapnlpjidoomhjpl?label=Chrome) ![Edge Addons Version](https://img.shields.io/badge/dynamic/json?color=blue&label=Edge&query=%24.version&url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Faaammfjdfifgnfnbflolojihjfhdploj&prefix=v) ![Firefox Version](https://img.shields.io/amo/v/bewlycat?label=Firefox)
 
 ![Github Downloads](https://img.shields.io/github/downloads/keleus/BewlyCat/total?label=Github%20Downloads) ![Chrome Web Store Users](https://img.shields.io/chrome-web-store/users/oopkfefbgecikmfbbapnlpjidoomhjpl?label=Chrome%20Users) ![Edge Addons Users](https://img.shields.io/badge/dynamic/json?label=Edge%20Users&query=%24.activeInstallCount&url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Faaammfjdfifgnfnbflolojihjfhdploj) ![Firefox Users](https://img.shields.io/amo/users/bewlycat?label=Firefox%20Users)
@@ -97,6 +115,65 @@
 1. 在地址栏输入 `chrome://extensions/` 并按回车
 2. 打开 `开发者模式` 并点击 `加载已解压的拓展程序` <br/> <img width="655" alt="Snipaste_2022-03-27_18-17-04" src="https://user-images.githubusercontent.com/33394391/160276882-13da0484-92c1-47dd-add8-7655c5c2bf1c.png">
 3. 在浏览器中加载解压后的扩展文件夹
+
+</details>
+
+#### Safari (macOS)
+
+> 需要安装 Xcode（Mac App Store 免费下载），Apple Developer 免费账号即可。
+
+<details>
+ <summary> 展开 Safari 构建与安装步骤 </summary>
+
+##### 前置环境
+
+```bash
+# 确保安装了 Xcode 和 Node.js（推荐 v18+）
+# 在项目根目录安装依赖
+pnpm install
+```
+
+##### 步骤一：构建 Web 扩展
+
+```bash
+pnpm build-safari
+```
+
+生成 Web 扩展包到 `extension-safari/` 目录。
+
+##### 步骤二：转换为 Xcode 项目
+
+```bash
+pnpm convert-safari
+```
+
+运行 Apple 的 `safari-web-extension-converter`，生成 Xcode 项目到 `extension-safari-macos/`。
+
+##### 步骤三：在 Xcode 中签名并运行
+
+```bash
+open extension-safari-macos/BewlyCat/BewlyCat.xcodeproj
+```
+
+在 Xcode 中：
+
+1. 在项目导航栏选中 `BewlyCat` 项目
+2. 进入 **Signing & Capabilities** 选项卡
+3. 在 **Team** 下拉菜单中选择你的 Apple Developer 团队（免费账号即可）
+4. 同样的操作为 `BewlyCat Extension` Target 也设置 Team
+5. 按 **Cmd+R** 构建并运行
+6. Safari 会自动打开并提示启用扩展
+
+##### 步骤四：启用扩展
+
+1. 打开 **Safari → 设置 → 扩展**
+2. 勾选 **BewlyCat**
+3. 访问 `https://www.bilibili.com` 即可看到效果
+
+> **提示：**
+> - 如果需要配对的 iOS 设备，也可以在 Xcode 中选择 macOS 目标
+> - 如果遇到签名错误，检查 `extension-safari-macos/BewlyCat/BewlyCat.xcodeproj` 中的 Teams 是否正确设置
+> - 构建产物 `extension-safari/` 和 `extension-safari-macos/` 已加入 `.gitignore`，不会提交到仓库
 
 </details>
 
