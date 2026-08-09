@@ -1,5 +1,6 @@
 // 由于是浏览器环境，所以引入的ts不能使用webextension-polyfill相关api，包含获取本地Storage，获取的是网页的localStorage
 import { isSearchResultApiPath } from '~/constants/searchApi'
+import { setupSafariApiBridge } from '~/inject/safariApiBridge'
 import COMMENT_REPLY_TREE_GUIDES_CSS from '~/styles/commentReplyTree.scss?inline'
 import { BILIBILI_DESKTOP_USER_AGENT, isBilibiliWwwUrl } from '~/utils/bilibiliDesktopNavigation'
 import { isInBilibiliLiveContext } from '~/utils/bilibiliLive'
@@ -4911,6 +4912,8 @@ else if (shouldInitializePageScript) {
       resolveSettingsReady = null
     }
   })
+
+  setupSafariApiBridge()
 
   // 请求初始设置
   window.postMessage({
