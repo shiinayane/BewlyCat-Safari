@@ -4,6 +4,9 @@ import { settings } from '~/logic'
 import { recordBackgroundUnavailable } from '~/utils/apiDiagnostics'
 import { applyBilibiliTranslatedTitles, getBilibiliLocaleRequestParam } from '~/utils/bilibiliLocale'
 import { sendAbortableApiMessage, sendMessage } from '~/utils/messaging'
+import { shouldUseSafariMainWorldBridge } from '~/utils/safariApi'
+import { requestSafariMainWorldApi } from '~/utils/safariApiBridgeClient'
+import { isSafariRuntime } from '~/utils/safariRuntime'
 
 export interface ApiRequestOptions {
   signal?: AbortSignal
@@ -53,6 +56,7 @@ export interface APIClient extends APIFunction<typeof API_COLLECTION> {
 // eslint-disable-next-line ts/no-unsafe-declaration-merging
 export class APIClient {
   private readonly cache = new Map<string | symbol, any>()
+  private readonly isSafari = isSafariRuntime()
 
   constructor() {
     // @ts-expect-error ignore
@@ -62,6 +66,7 @@ export class APIClient {
           return this.cache.get(namespace)
         }
         else {
+          const isSafari = this.isSafari
           const api = new Proxy({}, {
             get(_, p) {
               return (options?: object, request?: ApiRequestOptions) => {
@@ -71,6 +76,11 @@ export class APIClient {
                 const requestOptions = isSearchResultRequest
                   ? { qv_id: getSearchQueryId(p, options), ...options }
                   : options
+
+                // Safari: route CSRF-sensitive actions through the MAIN world to preserve site origin/cookies.
+                if (isSafari && shouldUseSafariMainWorldBridge(namespace, p)) {
+                  return requestSafariMainWorldApi(namespace as string, p as string, options)
+                }
 
                 const message: Record<string, any> = {
                   contentScriptQuery: p as string,

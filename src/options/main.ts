@@ -15,7 +15,7 @@ import { localSettingsReady, settingsReady } from '~/logic'
 import { setupApp } from '~/logic/common-setup'
 import RESET_BEWLY_CSS from '~/styles/reset.css?raw'
 import { setBilibiliCookieSnapshot } from '~/utils/main'
-import { SVG_ICONS } from '~/utils/svgIcons'
+import { getSvgIcons } from '~/utils/svgIcons'
 
 import Options from './Options.vue'
 import { registerSettingsComponents } from './settingsComponents'
@@ -48,7 +48,7 @@ function mountOptionsPage() {
   const bundledStyle = document.createElement('style')
   bundledStyle.textContent = bundledStyleText
   const icons = document.createElement('div')
-  icons.innerHTML = SVG_ICONS
+  icons.innerHTML = getSvgIcons()
   const root = document.createElement('div')
   shadowRoot.append(resetStyle, bundledStyle, root, icons)
   document.body.appendChild(host)

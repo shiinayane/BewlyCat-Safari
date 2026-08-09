@@ -1,4 +1,4 @@
-import { SVG_ICONS } from '~/utils/svgIcons'
+import { getSvgIcons } from '~/utils/svgIcons'
 
 /** 模块开 + 顶栏可见性开 + 原版顶栏开：由插件托管 B 站原生顶栏 */
 export function shouldShowOriginalBilibiliTopBar(enableTopBarModule: boolean, enableTopBar: boolean, useOriginalBilibiliTopBar: boolean): boolean {
@@ -382,7 +382,7 @@ function ensureOriginalTopBarScrolledLayout(header: HTMLElement) {
     if (!doc.querySelector('[data-bewly-channel-icons]')) {
       const icons = doc.createElement('div')
       icons.dataset.bewlyChannelIcons = ''
-      icons.innerHTML = SVG_ICONS
+      icons.innerHTML = getSvgIcons()
       rememberAddedNode(icons)
       doc.body.appendChild(icons)
     }
