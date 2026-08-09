@@ -1,7 +1,9 @@
 // 由于是浏览器环境，所以引入的ts不能使用webextension-polyfill相关api，包含获取本地Storage，获取的是网页的localStorage
 import { isSearchResultApiPath } from '~/constants/searchApi'
+import { setupSafariApiBridge } from '~/inject/safariApiBridge'
 import COMMENT_REPLY_TREE_GUIDES_CSS from '~/styles/commentReplyTree.scss?inline'
 import { BILIBILI_DESKTOP_USER_AGENT, isBilibiliWwwUrl } from '~/utils/bilibiliDesktopNavigation'
+import { hasClipboardWrite } from '~/utils/clipboard'
 import { CommentReplyPageCache } from '~/utils/commentReplyPageCache'
 import type { CommentReplyAvatarAnchor, CommentReplyTreeBranch } from '~/utils/commentReplyTree'
 import { formatCommentReplyGuideCoordinate, getCommentReplyBranchPath, getCommentReplyBranchToggleY } from '~/utils/commentReplyTree'
@@ -4840,6 +4842,8 @@ else if (shouldInitializePageScript) {
     }
   })
 
+  setupSafariApiBridge()
+
   // 请求初始设置
   window.postMessage({
     type: 'BEWLY_REQUEST_SETTINGS',
@@ -5071,21 +5075,28 @@ else if (shouldInitializePageScript) {
   }
 
   // 拦截 navigator.clipboard.writeText，启用净化分享链接功能
-  const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard)
-  navigator.clipboard.writeText = function (text: string) {
-    if (!currentSettings?.enableCleanShareLink)
-      return originalWriteText(text)
+  if (hasClipboardWrite(navigator.clipboard)) {
+    try {
+      const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard)
+      navigator.clipboard.writeText = function (text: string) {
+        if (!currentSettings?.enableCleanShareLink)
+          return originalWriteText(text)
 
-    const isBilibiliShare = /【.+?】\s*https?:\/\//.test(text)
-    const hasBilibiliUrl = /https?:\/\/(?:www\.)?bilibili\.com\//.test(text) || /https?:\/\/b23\.tv\//.test(text)
+        const isBilibiliShare = /【.+?】\s*https?:\/\//.test(text)
+        const hasBilibiliUrl = /https?:\/\/(?:www\.)?bilibili\.com\//.test(text) || /https?:\/\/b23\.tv\//.test(text)
 
-    if (isBilibiliShare || hasBilibiliUrl) {
-      const includeTitle = currentSettings?.cleanShareLinkIncludeTitle ?? false
-      const removeTracking = currentSettings?.cleanShareLinkRemoveTrackingParams !== false
-      const cleanedText = cleanShareText(text, includeTitle, removeTracking)
-      return originalWriteText(cleanedText)
+        if (isBilibiliShare || hasBilibiliUrl) {
+          const includeTitle = currentSettings?.cleanShareLinkIncludeTitle ?? false
+          const removeTracking = currentSettings?.cleanShareLinkRemoveTrackingParams !== false
+          const cleanedText = cleanShareText(text, includeTitle, removeTracking)
+          return originalWriteText(cleanedText)
+        }
+
+        return originalWriteText(text)
+      }
     }
-
-    return originalWriteText(text)
+    catch (error) {
+      console.warn('[BewlyCat] Failed to patch clipboard.writeText:', error)
+    }
   }
 }

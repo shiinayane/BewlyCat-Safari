@@ -28,7 +28,7 @@ import { applyPreservedOrDefaultCustomPlay, applyRandomPlayActivationSettings, d
 import { markContentScriptHealthy } from '~/utils/refreshPrompt'
 import { getPluginSearchResultsUrl, navigateToPluginSearchResultsInPlace, openSearchResults, shouldUsePluginSearchResultsPage } from '~/utils/searchNavigation'
 import { setupShortcutHandlers } from '~/utils/shortcuts'
-import { SVG_ICONS } from '~/utils/svgIcons'
+import { getSvgIcons } from '~/utils/svgIcons'
 import { openLinkInBackground } from '~/utils/tabs'
 import { initVerticalVideoZoom, resetVerticalVideoZoom } from '~/utils/verticalVideoZoom'
 import { recordVideoVisitFromUrl } from '~/utils/videoVisitHistory'
@@ -1507,7 +1507,7 @@ else if (shouldInitializeContentScript) {
 
     // inject svg icons
     const svgDiv = document.createElement('div')
-    svgDiv.innerHTML = SVG_ICONS
+    svgDiv.innerHTML = getSvgIcons()
     shadowDOM.appendChild(svgDiv)
 
     document.body.appendChild(container)
