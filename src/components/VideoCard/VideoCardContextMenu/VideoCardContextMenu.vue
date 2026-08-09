@@ -10,6 +10,7 @@ import type { VideoCardContextMenuKey } from '~/logic/storage'
 import { Type as ThreePointV2Type } from '~/models/video/appForYou'
 import { useUserRelationStore } from '~/stores/userRelationStore'
 import api from '~/utils/api'
+import { copyText } from '~/utils/clipboard'
 import { cleanBilibiliUrl, getCSRF, getUserID, openLinkToNewTab } from '~/utils/main'
 import { openLinkInBackground } from '~/utils/tabs'
 
@@ -312,7 +313,7 @@ function handleCommonCommand(command: VideoOption) {
       break
 
     case VideoOption.CopyVideoLink:
-      navigator.clipboard.writeText(
+      void copyText(
         settings.value.enableCleanShareLink && settings.value.cleanShareLinkRemoveTrackingParams
           ? cleanBilibiliUrl(props.video.url!)
           : props.video.url!,
@@ -324,16 +325,16 @@ function handleCommonCommand(command: VideoOption) {
       const text = settings.value.cleanShareLinkIncludeTitle && props.video.title
         ? `${props.video.title} ${cleanUrl}`
         : cleanUrl
-      navigator.clipboard.writeText(text)
+      void copyText(text)
       handleClose()
       break
     }
     case VideoOption.CopyBVNumber:
-      navigator.clipboard.writeText(props.video.bvid!)
+      void copyText(props.video.bvid!)
       handleClose()
       break
     case VideoOption.CopyAVNumber:
-      navigator.clipboard.writeText(`av${props.video.id.toString()}`)
+      void copyText(`av${props.video.id.toString()}`)
       handleClose()
       break
 

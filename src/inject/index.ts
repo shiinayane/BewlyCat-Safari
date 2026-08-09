@@ -2,6 +2,7 @@
 import injectMessages from 'virtual:bewly-inject-messages'
 
 import { isSearchResultApiPath } from '~/constants/searchApi'
+import { setupSafariApiBridge } from '~/inject/safariApiBridge'
 import COMMENT_REPLY_TREE_GUIDES_CSS from '~/styles/commentReplyTree.scss?inline'
 import { getBilibiliDesktopNavigatorValues, isBilibiliWwwUrl } from '~/utils/bilibiliDesktopNavigation'
 import { isInBilibiliLiveContext } from '~/utils/bilibiliLive'
@@ -5004,6 +5005,8 @@ else if (shouldInitializePageScript) {
       resolveSettingsReady = null
     }
   })
+
+  setupSafariApiBridge()
 
   // 请求初始设置
   window.postMessage({
