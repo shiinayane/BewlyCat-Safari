@@ -1,4 +1,4 @@
-import { SVG_ICONS } from '~/utils/svgIcons'
+import { getSvgIcons } from '~/utils/svgIcons'
 
 const BILIBILI_TOP_BAR_SELECTORS = [
   '.bili-header',
@@ -333,7 +333,7 @@ function ensureOriginalTopBarScrolledLayout(header: HTMLElement) {
     if (!doc.querySelector('[data-bewly-channel-icons]')) {
       const icons = doc.createElement('div')
       icons.dataset.bewlyChannelIcons = ''
-      icons.innerHTML = SVG_ICONS
+      icons.innerHTML = getSvgIcons()
       doc.body.appendChild(icons)
     }
 

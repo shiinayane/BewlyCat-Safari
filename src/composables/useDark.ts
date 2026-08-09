@@ -3,6 +3,7 @@ import { usePreferredDark } from '@vueuse/core'
 import { DARK_MODE_BASE_COLOR_CHANGE } from '~/constants/globalEvents'
 import { settings } from '~/logic'
 import { isVideoPlaybackPage, setCookie } from '~/utils/main'
+import { updateSafariCommentTheme } from '~/utils/safariCommentTheme'
 
 const currentUrl = ref(typeof location === 'undefined' ? '' : location.href)
 const currentMinuteOfDay = ref(getCurrentMinuteOfDay())
@@ -191,6 +192,7 @@ export function useDark() {
     }
 
     syncBilibiliTheme(isDark.value)
+    updateSafariCommentTheme(isDark.value)
 
     // Only used as a temporary solution, which will eventually be removed
     // It seems like Bilibili already supports dark mode when the `bili_dark` class is added to the `html` element

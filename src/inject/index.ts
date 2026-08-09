@@ -1,7 +1,9 @@
 // 由于是浏览器环境，所以引入的ts不能使用webextension-polyfill相关api，包含获取本地Storage，获取的是网页的localStorage
 import { PAGE_NO_COOKIE_SEARCH_REQUEST, PAGE_NO_COOKIE_SEARCH_RESPONSE } from '~/constants/api'
+import { setupSafariApiBridge } from '~/inject/safariApiBridge'
 import type { Settings } from '~/logic/storage'
 import { BILIBILI_DESKTOP_USER_AGENT, isBilibiliWwwUrl } from '~/utils/bilibiliDesktopNavigation'
+import { hasClipboardWrite } from '~/utils/clipboard'
 import { isElectron } from '~/utils/main'
 
 // 存储当前设置状态
@@ -3610,33 +3612,29 @@ else if (shouldInitializePageScript) {
       patchCommentCustomElement(name, window.customElements.get(name))
   }
 
-  // 添加消息监听器
   window.addEventListener('message', (event) => {
-  // 确保消息来源是插件环境
-    if (event.source !== window)
+    if (event.source !== window || !event.data || typeof event.data !== 'object')
       return
 
     const { type, data } = event.data
+    if (type !== 'BEWLY_SETTINGS_UPDATE' || !data)
+      return
 
-    // 处理来自插件环境的消息
-    if (type === 'BEWLY_SETTINGS_UPDATE') {
-    // 更新设置
-      if (data) {
-        const isFirstTime = !settingsReady
-        currentSettings = data
-        preventMobileRedirectEnabled = data.preventMobileRedirect === true
-        settingsReady = true
-        refreshCommentReplyTrees()
-        if (getCommentReplyTreeMode() === null)
-          clearCommentReplyDeepLinkSettlement()
-        // 设置就绪后 B 站可能才开始 #reply 定位/展开
-        if (getCommentReplyDeepLinkId())
-          scheduleCommentReplyDeepLinkSettlement(isFirstTime ? 'immediate' : 'hash')
-        resolveSettingsReady?.()
-        resolveSettingsReady = null
-      }
-    }
+    const isFirstTime = !settingsReady
+    currentSettings = data
+    preventMobileRedirectEnabled = data.preventMobileRedirect === true
+    settingsReady = true
+    refreshCommentReplyTrees()
+    if (getCommentReplyTreeMode() === null)
+      clearCommentReplyDeepLinkSettlement()
+    // 设置就绪后 B 站可能才开始 #reply 定位/展开
+    if (getCommentReplyDeepLinkId())
+      scheduleCommentReplyDeepLinkSettlement(isFirstTime ? 'immediate' : 'hash')
+    resolveSettingsReady?.()
+    resolveSettingsReady = null
   })
+
+  setupSafariApiBridge()
 
   // 请求初始设置
   window.postMessage({
@@ -3848,22 +3846,29 @@ else if (shouldInitializePageScript) {
     return text
   }
 
-  // 拦截 navigator.clipboard.writeText，启用净化分享链接功能
-  const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard)
-  navigator.clipboard.writeText = function (text: string) {
-    if (!currentSettings?.enableCleanShareLink)
-      return originalWriteText(text)
+  // Intercept navigator.clipboard.writeText to enable clean share link feature
+  if (hasClipboardWrite(navigator.clipboard)) {
+    try {
+      const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard)
+      navigator.clipboard.writeText = function (text: string) {
+        if (!currentSettings?.enableCleanShareLink)
+          return originalWriteText(text)
 
-    const isBilibiliShare = /【.+?】\s*https?:\/\//.test(text)
-    const hasBilibiliUrl = /https?:\/\/(?:www\.)?bilibili\.com\//.test(text) || /https?:\/\/b23\.tv\//.test(text)
+        const isBilibiliShare = /【.+?】\s*https?:\/\//.test(text)
+        const hasBilibiliUrl = /https?:\/\/(?:www\.)?bilibili\.com\//.test(text) || /https?:\/\/b23\.tv\//.test(text)
 
-    if (isBilibiliShare || hasBilibiliUrl) {
-      const includeTitle = currentSettings?.cleanShareLinkIncludeTitle ?? false
-      const removeTracking = currentSettings?.cleanShareLinkRemoveTrackingParams !== false
-      const cleanedText = cleanShareText(text, includeTitle, removeTracking)
-      return originalWriteText(cleanedText)
+        if (isBilibiliShare || hasBilibiliUrl) {
+          const includeTitle = currentSettings?.cleanShareLinkIncludeTitle ?? false
+          const removeTracking = currentSettings?.cleanShareLinkRemoveTrackingParams !== false
+          const cleanedText = cleanShareText(text, includeTitle, removeTracking)
+          return originalWriteText(cleanedText)
+        }
+
+        return originalWriteText(text)
+      }
     }
-
-    return originalWriteText(text)
+    catch (error) {
+      console.warn('[BewlyCat] Failed to patch clipboard.writeText:', error)
+    }
   }
 }
