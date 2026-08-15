@@ -2439,6 +2439,11 @@ function handleOpusDisposeMessage(event: MessageEvent) {
     disposeOpusDetailDrawerLayout()
 }
 
+function handleOpusPageHide(event: PageTransitionEvent) {
+  if (!event.persisted)
+    disposeOpusDetailDrawerLayout()
+}
+
 export function setupOpusDetailDrawerLayout() {
   if (!isInIframe() || !isOpusDetailPage())
     return
@@ -2457,8 +2462,8 @@ export function setupOpusDetailDrawerLayout() {
   // 父页关闭 iframe 时销毁内部观察器与媒体
   window.removeEventListener('message', handleOpusDisposeMessage)
   window.addEventListener('message', handleOpusDisposeMessage)
-  window.removeEventListener('pagehide', disposeOpusDetailDrawerLayout)
-  window.addEventListener('pagehide', disposeOpusDetailDrawerLayout, { once: true })
+  window.removeEventListener('pagehide', handleOpusPageHide)
+  window.addEventListener('pagehide', handleOpusPageHide)
 
   // 转发：快速直出，不显示「正在整理动态详情…」，不做分栏重排
   if (isPlainOpusRequested()) {

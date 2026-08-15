@@ -38,8 +38,9 @@ export async function getManifest() {
     },
     permissions: [
       'storage',
-      'declarativeNetRequest',
+      isSafari ? 'declarativeNetRequestWithHostAccess' : 'declarativeNetRequest',
       'cookies',
+      'alarms',
       ...(!isFirefox && !isSafari ? ['scripting'] : []),
       ...isFirefox
         ? ['webRequest', 'webRequestBlocking']
@@ -106,6 +107,17 @@ export async function getManifest() {
 
   if (isDev)
     manifest.permissions?.push('webNavigation')
+
+  if (isSafari) {
+    Object.assign(manifest, {
+      browser_specific_settings: {
+        safari: {
+          // MAIN-world content scripts are part of the Safari compatibility contract.
+          strict_min_version: '18.0',
+        },
+      },
+    })
+  }
 
   if (isFirefox) {
     manifest.browser_specific_settings = {

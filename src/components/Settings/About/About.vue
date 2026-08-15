@@ -8,6 +8,7 @@ import Radio from '~/components/Radio.vue'
 import { useSettingsCloudSyncPreference } from '~/composables/useSettingsCloudSyncPreference'
 import { settings } from '~/logic'
 import { getBrowserInfo, parseBrowserInfo } from '~/utils/browserInfo'
+import { supportsBrowserSettingsSync } from '~/utils/safariRuntime'
 
 import { version } from '../../../../package.json'
 import Maintenance from '../Advanced/Maintenance.vue'
@@ -17,11 +18,14 @@ import SettingsSectionHeading from '../components/SettingsSectionHeading.vue'
 
 const hasNewVersion = ref<boolean>(false)
 const contributorsImageFailed = ref(false)
-const settingsCloudSyncPreference = useSettingsCloudSyncPreference()
 const browserInfo = ref(parseBrowserInfo())
 const isCopyingEnvironmentInfo = ref(false)
 const { t } = useI18n()
 const toast = useToast()
+const showSettingsCloudSync = supportsBrowserSettingsSync()
+const settingsCloudSyncPreference = showSettingsCloudSync
+  ? useSettingsCloudSyncPreference()
+  : ref(false)
 
 const isDev = computed((): boolean => import.meta.env.DEV)
 
@@ -139,7 +143,7 @@ async function handleCopyEnvironmentInfo() {
           </SettingsItem>
         </SettingsItemGroup>
 
-        <SettingsItemGroup :title="$t('settings.group_settings_sync')">
+        <SettingsItemGroup v-if="showSettingsCloudSync" :title="$t('settings.group_settings_sync')">
           <SettingsItem
             :title="$t('settings.enable_settings_sync')"
             :desc="$t('settings.enable_settings_sync_desc')"

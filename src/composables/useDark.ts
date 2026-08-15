@@ -151,6 +151,7 @@ export function useDark() {
         return
 
       lastDarkModeBaseColor = newColor
+      updateSafariCommentTheme(isDark.value)
       // 触发全局基准颜色变化事件
       window.dispatchEvent(new CustomEvent(DARK_MODE_BASE_COLOR_CHANGE, { detail: newColor }))
     },

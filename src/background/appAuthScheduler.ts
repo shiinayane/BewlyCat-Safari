@@ -1,18 +1,21 @@
+import { watch } from 'vue'
+import type { Alarms } from 'webextension-polyfill'
+import browser from 'webextension-polyfill'
+
 import { appAuthTokens, resetAppAuthTokens } from '~/logic/appAuthStorage'
 import { refreshAppAccessToken } from '~/utils/authProvider'
 
-const CHECK_INTERVAL = 5 * 60 * 1000 // 5 minutes
+const APP_AUTH_REFRESH_ALARM = 'bewly-app-auth-refresh'
+const CHECK_INTERVAL_MINUTES = 5
 const REFRESH_BUFFER = 10 * 60 * 1000 // 10 minutes
-const MIN_INTERVAL = 60 * 1000
 
-let timer: ReturnType<typeof setInterval> | null = null
+let initialized = false
+let stopTokenWatch: (() => void) | null = null
 let refreshing = false
 
-function clearTimer() {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
+function handleAppAuthAlarm(alarm: Alarms.Alarm) {
+  if (alarm.name === APP_AUTH_REFRESH_ALARM)
+    void ensureFreshTokens()
 }
 
 async function ensureFreshTokens() {
@@ -49,15 +52,31 @@ async function ensureFreshTokens() {
 }
 
 export function setupAppAuthScheduler() {
-  clearTimer()
+  if (initialized)
+    return
 
-  timer = setInterval(() => {
-    void ensureFreshTokens()
-  }, Math.max(CHECK_INTERVAL, MIN_INTERVAL))
+  initialized = true
+  browser.alarms.onAlarm.addListener(handleAppAuthAlarm)
+  void browser.alarms.create(APP_AUTH_REFRESH_ALARM, {
+    periodInMinutes: CHECK_INTERVAL_MINUTES,
+  })
 
-  void ensureFreshTokens()
+  stopTokenWatch = watch(
+    () => appAuthTokens.value,
+    () => {
+      void ensureFreshTokens()
+    },
+    { deep: true, immediate: true },
+  )
 }
 
 export function teardownAppAuthScheduler() {
-  clearTimer()
+  if (!initialized)
+    return
+
+  initialized = false
+  browser.alarms.onAlarm.removeListener(handleAppAuthAlarm)
+  void browser.alarms.clear(APP_AUTH_REFRESH_ALARM)
+  stopTokenWatch?.()
+  stopTokenWatch = null
 }

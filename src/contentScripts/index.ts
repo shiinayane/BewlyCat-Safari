@@ -15,12 +15,14 @@ import { applyBewlyWidescreen, exitBewlyWidescreen, isBewlyWidescreenActive, pre
 import { cleanupBilibiliScripts } from '~/utils/bilibiliScriptCleanup'
 import { captureOriginalBilibiliTopBar, ensureOriginalBilibiliTopBarAppended, resetBilibiliTopBarInlineStyles, setupLoginButtonClickHandlers } from '~/utils/bilibiliTopBar'
 import { initFavoriteDialogEnhancement } from '~/utils/favoriteDialog'
+import { shouldIgnoreIframeEscape } from '~/utils/iframeEscape'
 import { runWhenIdle } from '~/utils/lazyLoad'
 import { getLocalWallpaper, hasLocalWallpaper, isLocalWallpaperUrl } from '~/utils/localWallpaper'
 import { compareVersions, getCookie, injectCSS, isElectron, isHomePage, isInIframe, isNotificationPage, isVideoOrBangumiPage, isVideoPlaybackPage, isWatchLaterListPage } from '~/utils/main'
 import { initNativeFavoriteSeasonPlayAllIntercept } from '~/utils/nativeFavoriteSeasonPlayAll'
 import { applyAutoPlayByVideoType, applyDefaultCaptionState, applyDefaultDanmakuState, defaultMode, getVideoElement, handleVideoPageNavigation, isPlayerDisplayModeReady, isVideoPage, resetAutoPlayUserChangeFlag, resolveDefaultVideoPlayerMode, startAutoExitFullscreenMonitoring, startAutoPlayUserChangeMonitoring, webFullscreen, widescreen } from '~/utils/player'
 import { applyRandomPlayActivationSettings, destroyRandomPlay, initRandomPlay, isCustomPlayPage, resetRandomPlayInitialization, syncRandomPlayOrder, syncRandomPlayUI } from '~/utils/randomPlay'
+import { updateSafariCommentTheme } from '~/utils/safariCommentTheme'
 import { getPluginSearchResultsUrl, shouldUsePluginSearchResultsPage } from '~/utils/searchNavigation'
 import { setupShortcutHandlers } from '~/utils/shortcuts'
 import { getSvgIcons } from '~/utils/svgIcons'
@@ -1360,10 +1362,16 @@ else if (shouldInitializeContentScript) {
     if (event.source !== window.parent)
       return
 
+    if (!event.data || typeof event.data !== 'object')
+      return
+
     const { type, isDark, darkModeBaseColor, useOriginalBilibiliTopBar } = event.data
 
     if (type === IFRAME_DARK_MODE_CHANGE) {
-    // Check if we should apply selective dark mode (plugin UI only) on festival pages
+      if (typeof isDark !== 'boolean')
+        return
+
+      // Check if we should apply selective dark mode (plugin UI only) on festival pages
       const isSelectiveDark = isFestivalPage()
 
       if (isDark) {
@@ -1396,6 +1404,8 @@ else if (shouldInitializeContentScript) {
           document.body?.classList.remove('dark')
         }
       }
+
+      updateSafariCommentTheme(isDark)
     }
     else if (type === IFRAME_TOP_BAR_CHANGE) {
       if (typeof useOriginalBilibiliTopBar !== 'boolean')
@@ -1463,21 +1473,8 @@ else if (shouldInitializeContentScript) {
 
       console.log('[Bewly IFrame] ESC key pressed in iframe')
 
-      // 检查当前焦点元素
-      const activeElement = document.activeElement
-      const tagName = activeElement?.tagName?.toLowerCase()
-
-      // 检查是否是输入框或可编辑元素
-      const isInputElement
-      = tagName === 'input'
-        || tagName === 'textarea'
-        || activeElement?.hasAttribute('contenteditable')
-
-      console.log('[Bewly IFrame] Active element:', tagName, 'isInput:', isInputElement)
-
-      // 如果焦点在输入框内，不处理ESC键，让用户正常使用
-      if (isInputElement) {
-        console.log('[Bewly IFrame] Focus in input element, ignoring ESC')
+      if (shouldIgnoreIframeEscape(e)) {
+        console.log('[Bewly IFrame] Native editing or fullscreen flow, ignoring ESC')
         return
       }
 
