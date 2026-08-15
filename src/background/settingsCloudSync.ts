@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill'
 
 import { onMessage } from '~/utils/messaging'
+import { supportsBrowserSettingsSync } from '~/utils/safariRuntime'
 import type { SettingsCloudSyncEnableResponse, SettingsCloudSyncEntry, SettingsCloudSyncMode, SettingsCloudSyncStatus } from '~/utils/settingsCloudSyncProtocol'
 import {
   compareSettingsCloudSyncVersions,
@@ -515,7 +516,7 @@ async function handleEnableSettingsCloudSync(value: unknown): Promise<SettingsCl
 }
 
 export function setupSettingsCloudSync() {
-  if (initialized)
+  if (initialized || !supportsBrowserSettingsSync())
     return
 
   initialized = true

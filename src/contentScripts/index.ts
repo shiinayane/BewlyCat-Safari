@@ -29,6 +29,7 @@ import { isPhotoViewerOpen } from '~/utils/photoViewer'
 import { applyAutoPlayByVideoType, applyDefaultCaptionState, applyDefaultDanmakuState, applyRememberedPlaybackRate, defaultMode, getVideoElement, handleVideoPageNavigation, isPlayerDisplayModeReady, isPlayerShowingEndingRecommendation, isVideoPage, resetAutoPlayUserChangeFlag, resolveDefaultVideoPlayerMode, startAutoExitFullscreenMonitoring, startAutoPlayUserChangeMonitoring, startPlaybackRateMonitoring, webFullscreen, widescreen } from '~/utils/player'
 import { applyPreservedOrDefaultCustomPlay, applyRandomPlayActivationSettings, destroyRandomPlay, initRandomPlay, isCustomPlayPage, resetRandomPlayInitialization, syncRandomPlayOrder, syncRandomPlayUI } from '~/utils/randomPlay'
 import { markContentScriptHealthy } from '~/utils/refreshPrompt'
+import { updateSafariCommentTheme } from '~/utils/safariCommentTheme'
 import { getPluginSearchResultsUrl, navigateToPluginSearchResultsInPlace, openSearchResults, shouldUsePluginSearchResultsPage } from '~/utils/searchNavigation'
 import { installShortcutListener, setupShortcutHandlers } from '~/utils/shortcuts'
 import { getSvgIcons } from '~/utils/svgIcons'
@@ -1697,7 +1698,10 @@ else if (shouldInitializeContentScript) {
     const { type, isDark, darkModeBaseColor, useOriginalBilibiliTopBar, enableTopBar } = event.data
 
     if (type === IFRAME_DARK_MODE_CHANGE) {
-    // Check if we should apply selective dark mode (plugin UI only) on festival pages
+      if (typeof isDark !== 'boolean')
+        return
+
+      // Check if we should apply selective dark mode (plugin UI only) on festival pages
       const isSelectiveDark = isFestivalPage()
 
       if (isDark) {
@@ -1730,6 +1734,8 @@ else if (shouldInitializeContentScript) {
           document.body?.classList.remove('dark')
         }
       }
+
+      updateSafariCommentTheme(isDark)
     }
     else if (type === IFRAME_TOP_BAR_CHANGE) {
       if (typeof useOriginalBilibiliTopBar !== 'boolean')

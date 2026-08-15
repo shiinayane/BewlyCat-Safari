@@ -15,3 +15,10 @@ export function isSafariRuntime(
     && !/Chrome|Chromium|CriOS|Edg/i.test(userAgent)
     && /Apple/i.test(vendor)
 }
+
+/** Safari exposes storage.sync as a local storage area without cross-device sync. */
+export function supportsBrowserSettingsSync(
+  navigatorLike?: NavigatorLike,
+): boolean {
+  return !isSafariRuntime(navigatorLike)
+}
