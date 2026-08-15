@@ -4,6 +4,7 @@ import browser from 'webextension-polyfill'
 import Radio from '~/components/Radio.vue'
 import { useSettingsCloudSyncPreference } from '~/composables/useSettingsCloudSyncPreference'
 import { settings } from '~/logic'
+import { supportsBrowserSettingsSync } from '~/utils/safariRuntime'
 
 import { version } from '../../../../package.json'
 import Maintenance from '../Advanced/Maintenance.vue'
@@ -13,7 +14,10 @@ import SettingsSectionHeading from '../components/SettingsSectionHeading.vue'
 
 const hasNewVersion = ref<boolean>(false)
 const contributorsImageFailed = ref(false)
-const settingsCloudSyncPreference = useSettingsCloudSyncPreference()
+const showSettingsCloudSync = supportsBrowserSettingsSync()
+const settingsCloudSyncPreference = showSettingsCloudSync
+  ? useSettingsCloudSyncPreference()
+  : ref(false)
 
 const isDev = computed((): boolean => import.meta.env.DEV)
 
@@ -86,7 +90,7 @@ function handleContributorImageError() {
       </section>
 
       <section class="about-maintenance">
-        <SettingsItemGroup :title="$t('settings.group_settings_sync')">
+        <SettingsItemGroup v-if="showSettingsCloudSync" :title="$t('settings.group_settings_sync')">
           <SettingsItem
             :title="$t('settings.enable_settings_sync')"
             :desc="$t('settings.enable_settings_sync_desc')"
