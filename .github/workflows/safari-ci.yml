@@ -1,0 +1,51 @@
+name: Safari CI
+
+on:
+  push:
+    branches:
+      - safari
+    paths-ignore:
+      - LICENSE
+      - README-cmn_CN.md
+      - README-cmn_TW.md
+      - docs/**
+
+  pull_request:
+    branches:
+      - safari
+    paths-ignore:
+      - LICENSE
+      - README-cmn_CN.md
+      - README-cmn_TW.md
+      - docs/**
+
+jobs:
+  checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: |
+            - args: [--frozen-lockfile]
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test

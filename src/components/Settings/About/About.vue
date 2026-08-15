@@ -10,6 +10,7 @@ import { useSettingsCloudSyncPreference } from '~/composables/useSettingsCloudSy
 import { settings } from '~/logic'
 import { getBrowserInfo, parseBrowserInfo } from '~/utils/browserInfo'
 import { sendMessage } from '~/utils/messaging'
+import { supportsBrowserSettingsSync } from '~/utils/safariRuntime'
 import type { SettingsCloudSyncEnableResponse, SettingsCloudSyncStatus } from '~/utils/settingsCloudSyncProtocol'
 import {
   SETTINGS_CLOUD_SYNC_ENABLE_MESSAGE,
@@ -26,7 +27,6 @@ const hasNewVersion = ref<boolean>(false)
 const contributorsImageFailed = ref(false)
 const contributorsImageUsingCloud = ref(false)
 const contributorsImageSrc = ref(browser.runtime.getURL('/assets/contributors.svg'))
-const settingsCloudSyncPreference = useSettingsCloudSyncPreference()
 const browserInfo = ref(parseBrowserInfo())
 const isCopyingEnvironmentInfo = ref(false)
 const showSyncConflictDialog = ref(false)
@@ -38,6 +38,10 @@ const syncSwitchRenderTick = ref(0)
 const pendingEnableChoice = ref(false)
 const { t } = useI18n()
 const toast = useToast()
+const showSettingsCloudSync = supportsBrowserSettingsSync()
+const settingsCloudSyncPreference = showSettingsCloudSync
+  ? useSettingsCloudSyncPreference()
+  : ref(false)
 
 const isDev = computed((): boolean => import.meta.env.DEV)
 
@@ -256,7 +260,7 @@ async function handleCopyEnvironmentInfo() {
           </SettingsItem>
         </SettingsItemGroup>
 
-        <SettingsItemGroup :title="$t('settings.group_settings_sync')">
+        <SettingsItemGroup v-if="showSettingsCloudSync" :title="$t('settings.group_settings_sync')">
           <SettingsItem
             :title="$t('settings.enable_settings_sync')"
             :desc="$t('settings.enable_settings_sync_desc')"
