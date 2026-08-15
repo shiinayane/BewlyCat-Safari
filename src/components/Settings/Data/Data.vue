@@ -7,6 +7,7 @@ import Dialog from '~/components/Dialog.vue'
 import Radio from '~/components/Radio.vue'
 import { useSettingsCloudSyncPreference } from '~/composables/useSettingsCloudSyncPreference'
 import { sendMessage } from '~/utils/messaging'
+import { supportsBrowserSettingsSync } from '~/utils/safariRuntime'
 import type { SettingsCloudSyncEnableResponse, SettingsCloudSyncStatus } from '~/utils/settingsCloudSyncProtocol'
 import {
   SETTINGS_CLOUD_SYNC_ENABLE_MESSAGE,
@@ -18,7 +19,10 @@ import SettingsItemGroup from '../components/SettingsItemGroup.vue'
 import SettingsSectionHeading from '../components/SettingsSectionHeading.vue'
 import Maintenance from './Maintenance.vue'
 
-const settingsCloudSyncPreference = useSettingsCloudSyncPreference()
+const showSettingsCloudSync = supportsBrowserSettingsSync()
+const settingsCloudSyncPreference = showSettingsCloudSync
+  ? useSettingsCloudSyncPreference()
+  : ref(false)
 const showSyncConflictDialog = ref(false)
 const isSyncToggling = ref(false)
 // The switch stays visually checked while the direction dialog is open because
@@ -133,7 +137,7 @@ function handleSyncDialogClose() {
       icon="i-mingcute:save-2-fill"
     />
 
-    <SettingsItemGroup :title="$t('settings.group_settings_sync')">
+    <SettingsItemGroup v-if="showSettingsCloudSync" :title="$t('settings.group_settings_sync')">
       <SettingsItem
         :title="$t('settings.enable_settings_sync')"
         :desc="$t('settings.enable_settings_sync_desc')"

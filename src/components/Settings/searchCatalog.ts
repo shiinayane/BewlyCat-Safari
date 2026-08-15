@@ -1,4 +1,5 @@
 import { isFirefoxBuild } from '~/utils/buildTarget'
+import { supportsBrowserSettingsSync } from '~/utils/safariRuntime'
 
 import { MenuType } from './types'
 
@@ -854,8 +855,7 @@ const baseSettingsSearchEntries: SettingsSearchEntry[] = [
 
   ...createEntries(dataRoute, [
     'settings.menu_data',
-    'settings.group_settings_sync',
-    'settings.enable_settings_sync',
+    ...(supportsBrowserSettingsSync() ? ['settings.group_settings_sync', 'settings.enable_settings_sync'] : []),
     'settings.maintenance.backup_title',
     'settings.import_settings',
     'settings.export_settings',
