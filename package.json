@@ -11,6 +11,7 @@
     "build-pack": "pnpm build && pnpm build-firefox && pnpm pack:zip && pnpm pack:zip-firefox && pnpm pack:zip-firefox-sources",
     "dev": "pnpm run clear && cross-env NODE_ENV=development esno scripts/dev.ts",
     "dev-firefox": "pnpm run clear-firefox && cross-env NODE_ENV=development FIREFOX=true esno scripts/dev.ts",
+    "dev-safari": "pnpm run clear-safari && cross-env NODE_ENV=development SAFARI=true esno scripts/dev.ts",
     "build": "cross-env NODE_ENV=production run-s --npm-path pnpm clear build:prepare build:js build:inject build:options build:bg",
     "build-safari": "cross-env NODE_ENV=production SAFARI=true run-s --npm-path pnpm clear-safari build:prepare build:js build:inject build:options build:bg",
     "build-firefox": "cross-env NODE_ENV=production FIREFOX=true run-s --npm-path pnpm clear-firefox build:prepare build:js build:inject build:options build:bg",
