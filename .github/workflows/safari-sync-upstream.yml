@@ -1,0 +1,235 @@
+name: Safari Sync Upstream
+
+# 定时把 safari 分支的 Safari 适配提交 rebase 到上游最新 release tag 上。
+# 无冲突且检查全部通过时自动推送到 safari（旧指针备份到 safari-prev）；
+# 冲突或检查失败时开 issue，检查失败的结果另外推到 sync/upstream-<ref> 分支便于接手。
+# 定时任务遇到同一目标已有未关闭的同步 issue 时直接跳过，不重复报错；手动触发不跳过。
+#
+# 需要仓库 secret SAFARI_SYNC_TOKEN：仅授权本仓库的 fine-grained PAT，
+# 权限 Contents / Workflows / Issues 均为 Read and write。
+# （上游改动 .github/workflows 时，默认 GITHUB_TOKEN 无权推送。）
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 上游目标 ref（留空为最新 release tag，也可填 upstream/main）
+        required: false
+        type: string
+
+concurrency:
+  group: safari-sync-upstream
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REPO: keleus/BewlyCat
+  TARGET_BRANCH: safari
+  BACKUP_BRANCH: safari-prev
+
+jobs:
+  sync:
+    name: Rebase onto upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check token
+        env:
+          SAFARI_SYNC_TOKEN: ${{ secrets.SAFARI_SYNC_TOKEN }}
+        run: |
+          if [ -z "$SAFARI_SYNC_TOKEN" ]; then
+            echo "::error::缺少仓库 secret SAFARI_SYNC_TOKEN"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.SAFARI_SYNC_TOKEN }}
+
+      - name: Resolve upstream target
+        id: target
+        env:
+          REF_INPUT: ${{ inputs.ref }}
+          GH_TOKEN: ${{ secrets.SAFARI_SYNC_TOKEN }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream "https://github.com/$UPSTREAM_REPO.git"
+          git fetch --quiet upstream '+refs/heads/main:refs/remotes/upstream/main' '+refs/tags/*:refs/tags/*'
+
+          ref="$REF_INPUT"
+          if [ -z "$ref" ]; then
+            ref=$(git tag --list 'v*' --merged upstream/main --sort=-v:refname | head -n 1)
+          fi
+          if [ -z "$ref" ] || ! git rev-parse --verify --quiet "$ref^{commit}" >/dev/null; then
+            echo "::error::无法解析上游目标 ref：${ref:-<empty>}"
+            exit 1
+          fi
+
+          old_head=$(git rev-parse HEAD)
+          title="[safari-sync] 同步到 $ref 需要处理"
+          {
+            echo "ref=$ref"
+            echo "title=$title"
+            echo "slug=$(echo "$ref" | sed 's#^upstream/##; s#[^A-Za-z0-9._-]#-#g')"
+            echo "old_head=$old_head"
+            echo "old_base=$(git merge-base "$old_head" "$ref")"
+          } >> "$GITHUB_OUTPUT"
+
+          if git merge-base --is-ancestor "$ref" "$old_head"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "$TARGET_BRANCH 已包含 $ref，无需同步。" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'safari-sync in:title' --limit 100 \
+              --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+            if [ -n "$existing" ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "$ref 的同步已在 #$existing 中等待处理，跳过。" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Rebase Safari commits
+        id: rebase
+        if: steps.target.outputs.skip != 'true'
+        env:
+          REF: ${{ steps.target.outputs.ref }}
+          OLD_BASE: ${{ steps.target.outputs.old_base }}
+        run: |
+          if git rebase "$REF"; then
+            echo "已将 Safari 提交 rebase 到 \`$REF\`：" >> "$GITHUB_STEP_SUMMARY"
+            git log --format='- %h %s' "$REF..HEAD" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          report="$RUNNER_TEMP/sync-report.md"
+          files=$(git diff --name-only --diff-filter=U)
+          {
+            echo "### rebase 到 \`$REF\` 时出现冲突"
+            echo
+            echo "冲突提交：\`$(git log -1 --format='%h %s' REBASE_HEAD)\`"
+            echo
+            echo "冲突文件："
+            echo "$files" | sed 's/^/- `/; s/$/`/'
+            echo
+            echo "上游在这些文件上的相关提交："
+            echo
+            echo '```'
+            # shellcheck disable=SC2086
+            git log --oneline "$OLD_BASE..$REF" -- $files | head -n 30
+            echo '```'
+          } > "$report"
+          git rebase --abort
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Set up Node.js
+        if: steps.target.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install pnpm
+        if: steps.target.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        if: steps.target.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: steps.target.outputs.skip != 'true'
+        run: pnpm lint
+
+      - name: Type check
+        if: steps.target.outputs.skip != 'true'
+        run: pnpm typecheck
+
+      - name: Test
+        if: steps.target.outputs.skip != 'true'
+        run: pnpm test --run
+
+      - name: Build Safari extension
+        if: steps.target.outputs.skip != 'true'
+        run: pnpm build-safari
+
+      - name: Promote to safari
+        id: promote
+        if: steps.target.outputs.skip != 'true'
+        env:
+          OLD_HEAD: ${{ steps.target.outputs.old_head }}
+          REF: ${{ steps.target.outputs.ref }}
+          GH_TOKEN: ${{ secrets.SAFARI_SYNC_TOKEN }}
+        run: |
+          git push --no-verify --force origin "$OLD_HEAD:refs/heads/$BACKUP_BRANCH"
+          git push --no-verify --force-with-lease="refs/heads/$TARGET_BRANCH:$OLD_HEAD" origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "已推送到 \`$TARGET_BRANCH\`，旧指针备份在 \`$BACKUP_BRANCH\`（\`${OLD_HEAD:0:8}\`）。" >> "$GITHUB_STEP_SUMMARY"
+
+          # 同步成功后关闭之前未解决的同步 issue
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'safari-sync in:title' --limit 100 \
+            --json number,title --jq '.[] | select(.title | startswith("[safari-sync]")) | .number' \
+            | while read -r number; do
+                gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "已自动同步到 \`$REF\`，关闭此 issue。"
+              done
+
+      - name: Report failure
+        if: failure() && steps.target.outputs.ref != ''
+        env:
+          REF: ${{ steps.target.outputs.ref }}
+          SLUG: ${{ steps.target.outputs.slug }}
+          TITLE: ${{ steps.target.outputs.title }}
+          REBASE_OUTCOME: ${{ steps.rebase.outcome }}
+          PROMOTE_OUTCOME: ${{ steps.promote.outcome }}
+          GH_TOKEN: ${{ secrets.SAFARI_SYNC_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          report="$RUNNER_TEMP/sync-report.md"
+          if [ "$PROMOTE_OUTCOME" = failure ]; then
+            echo "### 检查已通过，但推送到 \`$TARGET_BRANCH\` 失败（可能期间有人更新了该分支），重新手动触发即可。" > "$report"
+          elif [ "$REBASE_OUTCOME" = success ]; then
+            branch="sync/upstream-$SLUG"
+            git push --no-verify --force origin "HEAD:refs/heads/$branch"
+            {
+              echo "### rebase 到 \`$REF\` 无冲突，但检查未通过"
+              echo
+              echo "rebase 结果已推到 \`$branch\`，在该分支修复后推回 \`$TARGET_BRANCH\` 即可："
+              echo
+              echo '```sh'
+              echo "git fetch origin && git switch -C $branch origin/$branch"
+              echo "# 修复并提交（可用 fixup + autosquash 并入对应 Safari 提交）"
+              echo "git push --force-with-lease origin $branch:$TARGET_BRANCH"
+              echo '```'
+            } > "$report"
+          elif [ -f "$report" ]; then
+            {
+              echo
+              echo "本地处理："
+              echo
+              echo '```sh'
+              echo "git fetch upstream --tags && git switch $TARGET_BRANCH && git pull"
+              echo "git rebase $REF   # 解决冲突后 git rebase --continue"
+              echo "git push --force-with-lease origin $TARGET_BRANCH"
+              echo '```'
+            } >> "$report"
+          else
+            echo "同步在 rebase 之前失败，详见运行日志。" > "$report"
+          fi
+          echo >> "$report"
+          echo "运行日志：$RUN_URL" >> "$report"
+
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'safari-sync in:title' --limit 100 \
+            --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$report"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$report"
+          fi
