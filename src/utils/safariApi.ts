@@ -101,6 +101,12 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
     headers: FORM_HEADERS,
     body: { season_id: 0, platform: 'web', csrf: '' },
   },
+  'favorite.updateVideoFavorites': {
+    url: 'https://api.bilibili.com/x/v3/fav/resource/deal',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { rid: 0, type: 2, add_media_ids: '', del_media_ids: '', platform: 'web', csrf: '' },
+  },
   'moment.setMomentLike': {
     url: 'https://api.bilibili.com/x/dynamic/feed/dyn/thumb',
     method: 'post',
@@ -111,6 +117,39 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
       spmid: '333.1369.0.0',
       from_spmid: '333.999.0.0',
     },
+    params: { csrf: '' },
+  },
+  'moment.addMomentComment': {
+    url: 'https://api.bilibili.com/x/v2/reply/add',
+    method: 'post',
+    headers: FORM_HEADERS,
+    // 与后台 serializeCommentForm 一致：空 root/parent 等字段由 encodeFormBody 省略。
+    body: {
+      type: 17,
+      oid: '',
+      root: '',
+      parent: '',
+      message: '',
+      plat: 1,
+      at_name_to_mid: '',
+      pictures: '',
+      sync_to_dynamic: '',
+      gaia_source: 'main_web',
+      statistics: JSON.stringify({ appId: 100, platform: 5 }),
+      csrf: '',
+    },
+  },
+  'moment.deleteMomentComment': {
+    url: 'https://api.bilibili.com/x/v2/reply/del',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { type: 17, oid: '', rpid: '', csrf: '' },
+  },
+  'moment.reportMoment': {
+    url: 'https://api.bilibili.com/x/dynamic/feed/dynamic_report/add',
+    method: 'post',
+    headers: JSON_HEADERS,
+    body: { accused_uid: 0, dynamic_id: '', reason_type: 0, reason_desc: null },
     params: { csrf: '' },
   },
   'video.webDislikeVideo': {

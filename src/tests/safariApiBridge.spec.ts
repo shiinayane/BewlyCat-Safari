@@ -27,7 +27,11 @@ describe('safari API bridge routing', () => {
       'favorite.editFavoriteFolder',
       'favorite.delFavoriteFolder',
       'favorite.unfavFavoriteSeason',
+      'favorite.updateVideoFavorites',
       'moment.setMomentLike',
+      'moment.addMomentComment',
+      'moment.deleteMomentComment',
+      'moment.reportMoment',
       'video.webDislikeVideo',
       'user.relationModify',
       'user.exchangeCoupon',
@@ -62,6 +66,37 @@ describe('safari API bridge routing', () => {
         body: 'resources=1%3A2&media_id=3&platform=web&csrf=token',
       }),
     )
+  })
+
+  it('omits empty comment form fields like the background serializer', async () => {
+    const json = vi.fn().mockResolvedValue({ code: 0 })
+    const fetchMock = vi.fn().mockResolvedValue({ json })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await executeSafariApiRequest('moment', 'addMomentComment', {
+      oid: '42',
+      type: 11,
+      root: '',
+      parent: '',
+      message: 'hi',
+      at_name_to_mid: '',
+      pictures: '',
+      sync_to_dynamic: '',
+      csrf: 'token',
+    })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.bilibili.com/x/v2/reply/add')
+    const body = new URLSearchParams(init.body)
+    expect(Object.fromEntries(body)).toEqual({
+      type: '11',
+      oid: '42',
+      message: 'hi',
+      plat: '1',
+      gaia_source: 'main_web',
+      statistics: JSON.stringify({ appId: 100, platform: 5 }),
+      csrf: 'token',
+    })
   })
 
   it('preserves JSON bodies and query CSRF parameters', async () => {
