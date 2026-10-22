@@ -156,7 +156,8 @@ jobs:
 
       - name: Test
         if: steps.target.outputs.skip != 'true'
-        run: pnpm test --run
+        shell: bash
+        run: pnpm test --run 2>&1 | tee "$RUNNER_TEMP/test.log"
 
       - name: Build Safari extension
         if: steps.target.outputs.skip != 'true'
@@ -209,6 +210,28 @@ jobs:
               echo "git push --force-with-lease origin $branch:$TARGET_BRANCH"
               echo '```'
             } > "$report"
+
+            # 从测试日志提取 Safari 转发清单的缺漏与定义漂移（awk 写法兼容 GNU/BSD）
+            test_log="$RUNNER_TEMP/test.log"
+            if [ -f "$test_log" ]; then
+              plain_log=$(sed $'s/\x1b\\[[0-9;]*m//g' "$test_log")
+              missing=$(printf '%s\n' "$plain_log" | awk -F'SAFARI_BRIDGE_MISSING: ' 'NF > 1 { sub(/: expected .*/, "", $2); print $2; exit }')
+              drifted=$(printf '%s\n' "$plain_log" | awk '/FAIL/ && / (matches the background definition|encodes its body like the background serializer)/ { sub(/.*> /, ""); sub(/ (matches the background definition|encodes its body like the background serializer).*/, ""); print }' | sort -u)
+              if [ -n "$missing" ]; then
+                {
+                  echo
+                  echo "上游新增了带 CSRF 的写接口，尚未加入 Safari 页面环境转发清单（\`src/utils/safariApi.ts\`）："
+                  printf '%s\n' "$missing" | awk '{ n = split($0, items, ", "); for (i = 1; i <= n; i++) { split(items[i], parts, " "); printf "- `%s`：%s\n", parts[1], parts[2] } }'
+                } >> "$report"
+              fi
+              if [ -n "$drifted" ]; then
+                {
+                  echo
+                  echo "上游修改了以下已转发接口的定义，需同步 Safari 转发配置："
+                  printf '%s\n' "$drifted" | awk '{ printf "- `%s`\n", $0 }'
+                } >> "$report"
+              fi
+            fi
           elif [ -f "$report" ]; then
             {
               echo
