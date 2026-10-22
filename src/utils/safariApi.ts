@@ -7,6 +7,7 @@ export interface SafariApiDefinition {
   headers?: Record<string, string>
   body?: Record<string, unknown>
   params?: Record<string, unknown>
+  bodySerializer?: (body: Record<string, unknown>) => BodyInit
 }
 
 const FORM_HEADERS = {
@@ -15,6 +16,15 @@ const FORM_HEADERS = {
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
+}
+
+// 与后台 moment.ts 的 serializeMomentVoteBody 一致：动态 id 超出安全整数，需按原文拼入 JSON。
+function serializeMomentVoteBody(body: Record<string, unknown>) {
+  const dynamicId = String(body.dynamic_id ?? '')
+  const serializedDynamicId = /^\d+$/.test(dynamicId) ? dynamicId : '0'
+  const { dynamic_id: _dynamicId, ...rest } = body
+  const serializedRest = JSON.stringify(rest)
+  return `${serializedRest.slice(0, -1)},"dynamic_id":${serializedDynamicId}}`
 }
 
 // Safari rejects these cookie-authenticated writes when they originate from the
@@ -87,7 +97,7 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
     url: 'https://api.bilibili.com/x/v3/fav/folder/edit',
     method: 'post',
     headers: FORM_HEADERS,
-    body: { media_id: 0, title: '', platform: 'web', csrf: '' },
+    body: { media_id: 0, title: '', privacy: 0, platform: 'web', csrf: '' },
   },
   'favorite.delFavoriteFolder': {
     url: 'https://api.bilibili.com/x/v3/fav/folder/del',
@@ -100,6 +110,12 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
     method: 'post',
     headers: FORM_HEADERS,
     body: { season_id: 0, platform: 'web', csrf: '' },
+  },
+  'favorite.unfavFavoriteFolder': {
+    url: 'https://api.bilibili.com/x/v3/fav/folder/unfav',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { media_id: 0, platform: 'web', csrf: '' },
   },
   'favorite.updateVideoFavorites': {
     url: 'https://api.bilibili.com/x/v3/fav/resource/deal',
@@ -151,6 +167,49 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
     headers: FORM_HEADERS,
     body: { type: 17, oid: '', rpid: '', csrf: '' },
   },
+  'moment.checkRepost': {
+    url: 'https://api.bilibili.com/x/dynamic/feed/create/submit_check',
+    method: 'post',
+    headers: JSON_HEADERS,
+    body: { content: {}, scene: 4, attach_card: undefined },
+    params: { csrf: '' },
+  },
+  'moment.submitRepost': {
+    url: 'https://api.bilibili.com/x/dynamic/feed/create/dyn',
+    method: 'post',
+    headers: JSON_HEADERS,
+    body: { dyn_req: {}, web_repost_src: { dyn_id_str: '' } },
+    params: { csrf: '', platform: 'web' },
+  },
+  'moment.submitMomentVote': {
+    url: 'https://api.bilibili.com/x/vote/do_vote',
+    method: 'post',
+    headers: JSON_HEADERS,
+    body: {
+      vote_id: 0,
+      votes: [],
+      voter_uid: 0,
+      status: 0,
+      op_bit: 0,
+      dynamic_id: '',
+      csrf: '',
+      csrf_token: '',
+    },
+    params: { csrf: '' },
+    bodySerializer: serializeMomentVoteBody,
+  },
+  'moment.reserveMoment': {
+    url: 'https://api.bilibili.com/x/space/reserve',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { sid: '', csrf: '' },
+  },
+  'moment.cancelMomentReservation': {
+    url: 'https://api.bilibili.com/x/space/reserve/cancel',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { sid: '', csrf: '' },
+  },
   'moment.reportMoment': {
     url: 'https://api.bilibili.com/x/dynamic/feed/dynamic_report/add',
     method: 'post',
@@ -181,6 +240,36 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
     method: 'post',
     headers: FORM_HEADERS,
     body: { fid: '', act: 1, re_src: 11, csrf: '' },
+  },
+  'user.createFollowingGroup': {
+    url: 'https://api.bilibili.com/x/relation/tag/create',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { tag: '', csrf: '' },
+  },
+  'user.renameFollowingGroup': {
+    url: 'https://api.bilibili.com/x/relation/tag/update',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { tagid: '', name: '', csrf: '' },
+  },
+  'user.deleteFollowingGroup': {
+    url: 'https://api.bilibili.com/x/relation/tag/del',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { tagid: '', csrf: '' },
+  },
+  'user.moveFollowingUsers': {
+    url: 'https://api.bilibili.com/x/relation/tags/moveUsers',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { beforeTagids: '', afterTagids: '', fids: '', csrf: '' },
+  },
+  'user.copyFollowingUsers': {
+    url: 'https://api.bilibili.com/x/relation/tags/copyUsers',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { fids: '', tagids: '', csrf: '' },
   },
   'user.exchangeCoupon': {
     url: 'https://api.bilibili.com/x/vip/privilege/receive',

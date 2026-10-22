@@ -1,3 +1,4 @@
+import type { SafariApiDefinition } from '~/utils/safariApi'
 import {
   getSafariMainWorldApiDefinition,
   SAFARI_API_REQUEST,
@@ -25,10 +26,12 @@ function encodeFormBody(body: Record<string, unknown>): string {
   return bodyParams.toString()
 }
 
-function encodeRequestBody(headers: Record<string, string> | undefined, body: Record<string, unknown>): string | undefined {
+function encodeRequestBody(definition: SafariApiDefinition, body: Record<string, unknown>): BodyInit | undefined {
   if (!Object.keys(body).length)
     return undefined
-  if (headers?.['Content-Type']?.includes('application/json'))
+  if (definition.bodySerializer)
+    return definition.bodySerializer(body)
+  if (definition.headers?.['Content-Type']?.includes('application/json'))
     return JSON.stringify(body)
   return encodeFormBody(body) || undefined
 }
@@ -42,12 +45,19 @@ export async function executeSafariApiRequest(
   if (!definition)
     throw new Error(`Unknown Safari API: ${namespace}.${apiName}`)
 
-  const params = { ...definition.params }
-  const body = { ...definition.body }
+  // 与后台 apiListenerFactory 的合并规则一致：body 与 params 同时声明的字段两边都写入。
+  const defaultParams = definition.params ?? {}
+  const defaultBody = definition.body ?? {}
+  const params: Record<string, unknown> = { ...defaultParams }
+  const body: Record<string, unknown> = { ...defaultBody }
   Object.entries(options).forEach(([key, value]) => {
-    if (key in body)
+    if (value === undefined)
+      return
+    if (defaultBody[key] !== undefined)
       body[key] = value
-    else
+    if (defaultParams[key] !== undefined)
+      params[key] = value
+    else if (defaultBody[key] === undefined)
       params[key] = value
   })
 
@@ -55,7 +65,7 @@ export async function executeSafariApiRequest(
     method: definition.method,
     headers: definition.headers,
     credentials: 'include',
-    body: encodeRequestBody(definition.headers, body),
+    body: encodeRequestBody(definition, body),
   })
   return response.json()
 }
