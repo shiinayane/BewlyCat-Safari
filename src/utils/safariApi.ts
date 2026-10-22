@@ -119,6 +119,12 @@ export const SAFARI_MAIN_WORLD_API_DEFINITIONS = {
     },
     params: { csrf: '' },
   },
+  'moment.setMomentCommentLike': {
+    url: 'https://api.bilibili.com/x/v2/reply/action',
+    method: 'post',
+    headers: FORM_HEADERS,
+    body: { type: 17, oid: '', rpid: '', action: 1, csrf: '' },
+  },
   'moment.addMomentComment': {
     url: 'https://api.bilibili.com/x/v2/reply/add',
     method: 'post',
