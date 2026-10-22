@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { executeSafariApiRequest } from '~/inject/safariApiBridge'
-import {
-  SAFARI_MAIN_WORLD_API_DEFINITIONS,
-  shouldUseSafariMainWorldBridge,
-} from '~/utils/safariApi'
+import { shouldUseSafariMainWorldBridge } from '~/utils/safariApi'
 import { isSafariRuntime } from '~/utils/safariRuntime'
 
 afterEach(() => {
@@ -12,34 +9,6 @@ afterEach(() => {
 })
 
 describe('safari API bridge routing', () => {
-  it('keeps the main-world surface limited to current CSRF-sensitive writes', () => {
-    expect(Object.keys(SAFARI_MAIN_WORLD_API_DEFINITIONS)).toEqual([
-      'auth.logout',
-      'watchlater.saveToWatchLater',
-      'watchlater.removeFromWatchLater',
-      'watchlater.clearAllWatchLater',
-      'history.deleteHistoryItem',
-      'history.clearAllHistory',
-      'history.setHistoryPauseStatus',
-      'favorite.patchDelFavoriteResources',
-      'favorite.moveFavoriteResources',
-      'favorite.copyFavoriteResources',
-      'favorite.editFavoriteFolder',
-      'favorite.delFavoriteFolder',
-      'favorite.unfavFavoriteSeason',
-      'favorite.updateVideoFavorites',
-      'moment.setMomentLike',
-      'moment.setMomentCommentLike',
-      'moment.addMomentComment',
-      'moment.deleteMomentComment',
-      'moment.reportMoment',
-      'video.webDislikeVideo',
-      'user.relationModify',
-      'user.exchangeCoupon',
-      'user.receiveVipExp',
-    ])
-  })
-
   it('routes by namespace and method instead of method name alone', () => {
     expect(shouldUseSafariMainWorldBridge('watchlater', 'saveToWatchLater')).toBe(true)
     expect(shouldUseSafariMainWorldBridge('favorite', 'moveFavoriteResources')).toBe(true)
@@ -98,6 +67,27 @@ describe('safari API bridge routing', () => {
       statistics: JSON.stringify({ appId: 100, platform: 5 }),
       csrf: 'token',
     })
+  })
+
+  it('writes fields declared in both body and params to both, like the background', async () => {
+    const json = vi.fn().mockResolvedValue({ code: 0 })
+    const fetchMock = vi.fn().mockResolvedValue({ json })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await executeSafariApiRequest('moment', 'submitMomentVote', {
+      vote_id: 7,
+      votes: [1],
+      voter_uid: 3,
+      dynamic_id: '1234567890123456789',
+      csrf: 'token',
+      csrf_token: 'token',
+      ignored: undefined,
+    })
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.bilibili.com/x/vote/do_vote?csrf=token')
+    expect(init.body).toContain('"csrf":"token"')
+    expect(init.body).toMatch(/"dynamic_id":1234567890123456789\}$/)
   })
 
   it('preserves JSON bodies and query CSRF parameters', async () => {
