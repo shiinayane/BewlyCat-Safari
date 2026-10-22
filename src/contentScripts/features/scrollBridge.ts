@@ -26,10 +26,12 @@ export function installScrollBridge(viewport: HTMLElement): () => void {
     scrollDriver = driver
     clearTimeout(releaseDriverTimer)
     releaseDriverTimer = setTimeout(() => {
-      if (scrollDriver === 'document')
-        viewport.scrollTo({ top: window.scrollY, behavior: 'instant' })
-      else
-        window.scrollTo({ top: viewport.scrollTop, behavior: 'instant' })
+      if (Math.abs(viewport.scrollTop - window.scrollY) >= 1) {
+        if (scrollDriver === 'document')
+          viewport.scrollTo({ top: window.scrollY, behavior: 'instant' })
+        else
+          window.scrollTo({ top: viewport.scrollTop, behavior: 'instant' })
+      }
       scrollDriver = null
       mirroredDocumentTop = null
     }, 150)
@@ -49,6 +51,9 @@ export function installScrollBridge(viewport: HTMLElement): () => void {
       return
     }
 
+    if (scrollDriver === 'viewport')
+      return
+
     mirroredDocumentTop = null
     keepScrollDriver('document')
     viewport.scrollTo({ top, behavior: 'instant' })
@@ -66,6 +71,11 @@ export function installScrollBridge(viewport: HTMLElement): () => void {
     window.scrollTo({ top, behavior: 'instant' })
   }
 
+  function handleViewportInput() {
+    // 在首个 scroll 事件之前接管，避免旧文档事件抢先覆盖新的滚轮方向。
+    keepScrollDriver('viewport')
+  }
+
   const resizeObserver = new ResizeObserver(updateDocumentHeight)
   resizeObserver.observe(viewport)
   const content = viewport.querySelector('main')
@@ -75,11 +85,15 @@ export function installScrollBridge(viewport: HTMLElement): () => void {
   updateDocumentHeight()
   window.addEventListener('scroll', handleDocumentScroll, { passive: true })
   viewport.addEventListener('scroll', handleViewportScroll, { passive: true })
+  viewport.addEventListener('wheel', handleViewportInput, { passive: true })
+  viewport.addEventListener('touchstart', handleViewportInput, { passive: true })
 
   return () => {
     resizeObserver.disconnect()
     window.removeEventListener('scroll', handleDocumentScroll)
     viewport.removeEventListener('scroll', handleViewportScroll)
+    viewport.removeEventListener('wheel', handleViewportInput)
+    viewport.removeEventListener('touchstart', handleViewportInput)
     clearTimeout(releaseDriverTimer)
     spacer.remove()
     document.documentElement.style.scrollbarWidth = previousScrollbarWidth
