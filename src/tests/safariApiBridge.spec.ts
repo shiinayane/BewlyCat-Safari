@@ -29,6 +29,7 @@ describe('safari API bridge routing', () => {
       'favorite.unfavFavoriteSeason',
       'favorite.updateVideoFavorites',
       'moment.setMomentLike',
+      'moment.setMomentCommentLike',
       'moment.addMomentComment',
       'moment.deleteMomentComment',
       'moment.reportMoment',
